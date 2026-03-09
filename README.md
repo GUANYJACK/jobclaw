@@ -14,7 +14,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](./LICENSE)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](./CONTRIBUTING.md)
 
-> **一句话说清楚：** JobClaw 是一个开源的 AI 求职 Agent——自动抓岗位、用大模型帮你匹配、一键批量投递，投完还给你发 Telegram/Discord 消息汇报。  
+> **一句话说清楚：** JobClaw 是一个开源的 AI 求职 Agent——自动抓岗位、用大模型帮你匹配、一键批量投递，投完还给你发 Telegram/Discord 消息汇报。支持 Boss直聘、LinkedIn、JobsDB 三大平台。  
 > 你要做的，就是写好简历，然后等面试通知。
 
 ---
@@ -27,7 +27,7 @@
 - 好不容易看到一个还行的，点"立即沟通"，想半天打招呼说啥，发完又没下文
 - 一天下来投了十几个，回复的寥寥无几，**时间全花在重复劳动上**
 - 有些岗位 HR 三个月没上线了，你还在那认真写打招呼语——**投了个寂寞**
-- LinkedIn 也要刷，拉勾也要看，多平台来回切，脑子都乱了
+- LinkedIn 也要刷，拉勾也要看，JobsDB 也要投，多平台来回切，脑子都乱了
 - 投完之后**石沉大海**，哪个回了、哪个没回，全靠记忆
 
 你的时间应该花在**准备面试和提升自己**上，不是当人肉投递机器。
@@ -38,7 +38,7 @@
 
 | 步骤 | 人工操作 | JobClaw |
 | --- | --- | --- |
-| 🔍 搜岗位 | 多平台来回切，关键词一个个试 | **自动抓取** Boss直聘 + LinkedIn |
+| 🔍 搜岗位 | 多平台来回切，关键词一个个试 | **自动抓取** Boss直聘 + LinkedIn + JobsDB |
 | 📖 看 JD | 一个个点开，人肉阅读判断匹不匹配 | **LLM 智能匹配**，打分 + 给出匹配理由 |
 | 💬 打招呼 | 想措辞、复制粘贴、一个个发 | **自动生成打招呼语**，支持模板变量 |
 | 📤 投简历 | 点「立即沟通」重复 100 遍 | **自动批量投递**高匹配岗位 |
@@ -89,12 +89,32 @@
 
 支持变量：`$company`（公司名）、`$title`（岗位名）、`$name`（HR 名字）
 
+### 🌏 JobsDB 自动投递（港澳市场）
+
+针对香港求职市场的 JobsDB 平台，JobClaw 实现了完整的 Quick Apply 自动投递流程：
+
+1. 搜索岗位 → 解析职位列表
+2. 打开职位详情 → 点击"Quick Apply / Apply Now"
+3. 自动选择已有简历 / 上传 PDF 简历
+4. 提交申请 → 记录历史
+
+**反爬策略（针对 JobsDB 强化）：**
+
+- 🕶️ **隐身模式**：移除 `navigator.webdriver` 标识，伪装 `chrome.runtime`
+- 🎭 **随机指纹**：每次使用不同的 User-Agent 和视口尺寸
+- 📜 **人类模拟滚动**：随机滚动距离 + 随机间隔，触发懒加载
+- ⏱️ **随机延迟**：投递间隔 5-12 秒（可配置）
+- 📅 **每日上限**：默认 50 次/天
+- 🔄 **防重复投递**：历史记录去重
+- 🤖 **验证码检测**：检测到验证码自动暂停并通知
+- 🔀 **API 降级**：DOM 抓取失败时自动切换到 GraphQL API
+
 ### 🍪 Cookie 管理
 
 - `jobclaw login` — 弹出浏览器，交互式登录，cookie 自动保存到 `~/.jobclaw/cookies/`
 - `jobclaw login --check` — 检查已保存的 cookie 是否还有效
 - **优先级**：`.env` 中配置的 cookie > 持久化文件 > 提示你重新 login
-- 支持 Boss直聘 + LinkedIn
+- 支持 Boss直聘 + LinkedIn + JobsDB
 
 ### 🔔 通知
 
@@ -129,6 +149,9 @@ jobclaw login --platform boss
 
 # 登录 LinkedIn
 jobclaw login --platform linkedin
+
+# 登录 JobsDB
+jobclaw login --platform jobsdb
 
 # 一次性登录所有平台
 jobclaw login --platform all
@@ -175,6 +198,9 @@ jobclaw login --platform boss
 # 登录 LinkedIn
 jobclaw login --platform linkedin
 
+# 登录 JobsDB
+jobclaw login --platform jobsdb
+
 # 登录所有支持的平台
 jobclaw login --platform all
 
@@ -193,6 +219,9 @@ jobclaw scrape --platform boss --query "后端工程师" --limit 20
 
 # 抓取 LinkedIn
 jobclaw scrape --platform linkedin --query "AI Engineer" --limit 10
+
+# 抓取 JobsDB（香港市场）
+jobclaw scrape --platform jobsdb --query "Python Developer" --limit 20
 
 # 全平台抓取
 jobclaw scrape --platform all --query "Python 开发" --limit 30
@@ -244,12 +273,18 @@ jobclaw validate-profile --profile profiles/me.yaml
 | **平台 Cookie** | | | |
 | `BOSS_COOKIE` | 否 | - | Boss直聘 cookie（优先于持久化文件） |
 | `LINKEDIN_COOKIE` | 否 | - | LinkedIn cookie |
+| `JOBSDB_COOKIE` | 否 | - | JobsDB cookie（优先于持久化文件） |
 | **Boss直聘专属** | | | |
 | `BOSS_GREETING` | 否 | - | 打招呼模板，支持 `$company` `$title` `$name` 变量 |
 | `BOSS_APPLY_DELAY_MIN` | 否 | `3.0` | 投递间隔最小秒数 |
 | `BOSS_APPLY_DELAY_MAX` | 否 | `8.0` | 投递间隔最大秒数 |
 | `BOSS_DAILY_LIMIT` | 否 | `100` | 每日投递上限（1-150） |
 | `BOSS_SKIP_INACTIVE_DAYS` | 否 | `7` | 跳过 HR 多少天未活跃的岗位 |
+| **JobsDB 专属** | | | |
+| `JOBSDB_RESUME_PATH` | 否 | - | 简历 PDF 路径，用于 JobsDB 自动上传 |
+| `JOBSDB_APPLY_DELAY_MIN` | 否 | `5.0` | 投递间隔最小秒数 |
+| `JOBSDB_APPLY_DELAY_MAX` | 否 | `12.0` | 投递间隔最大秒数 |
+| `JOBSDB_DAILY_LIMIT` | 否 | `50` | 每日投递上限（1-100） |
 | **通知** | | | |
 | `TELEGRAM_BOT_TOKEN` | 否 | - | Telegram Bot Token |
 | `TELEGRAM_CHAT_ID` | 否 | - | Telegram Chat ID |
@@ -314,7 +349,7 @@ preferences:
 +---------------------+      +----------------------+
 |   Scraper Layer     |----->| Unified Job Objects  |
 | Boss直聘 / LinkedIn |      | (Pydantic 标准化)     |
-+----------+----------+      +----------+-----------+
+| / JobsDB            |      +----------+-----------+
            |                            |
            v                            v
 +---------------------+      +----------------------+
@@ -326,7 +361,7 @@ preferences:
 +---------------------+      +----------------------+
 |  Auto Applier       |----->| 投递状态              |
 | Boss直聘 / LinkedIn |      | 已投 / 失败 / 跳过    |
-+----------+----------+      +----------+-----------+
+| / JobsDB            |      +----------+-----------+
            |                            |
            +------------+---------------+
                         v
@@ -344,6 +379,7 @@ jobclaw/
     base.py                #   投递器基类
     boss.py                #   Boss直聘投递（打招呼 + 防封策略）
     linkedin.py            #   LinkedIn Easy Apply
+    jobsdb.py              #   JobsDB Quick Apply（反爬 + 自动选简历）
     captcha.py             #   验证码检测 + 通知
     history.py             #   投递历史记录（防重复）
   auth/                    # 登录认证
@@ -365,6 +401,7 @@ jobclaw/
     base.py                #   爬虫基类
     boss.py                #   Boss直聘抓取
     linkedin.py            #   LinkedIn 抓取
+    jobsdb.py              #   JobsDB 抓取（反爬 + API 降级）
   cli.py                   # CLI 入口（Click）
   config.py                # 配置管理（pydantic-settings）
   domain.py                # 数据模型（Pydantic）
@@ -382,6 +419,7 @@ tests/
 | --- | --- | --- | --- |
 | **Boss直聘** (zhipin.com) | ✅ | ✅ | Playwright 模拟打招呼 |
 | **LinkedIn** | ✅ | ✅ | Easy Apply 自动投递 |
+| **JobsDB** (jobsdb.com) | ✅ | ✅ | Quick Apply + 自动选简历（港澳市场） |
 | 拉勾 (Lagou) | 🔜 | 🔜 | 适配器开发中 |
 | 前程无忧 (51Job) | 🔜 | 🔜 | 适配器开发中 |
 

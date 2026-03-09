@@ -14,7 +14,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](./LICENSE)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](./CONTRIBUTING.md)
 
-> **TL;DR:** JobClaw is an open-source AI job hunting agent. It scrapes job listings from LinkedIn and Boss直聘, matches them against your profile using LLMs, auto-applies to the best fits, and notifies you of results via Telegram or Discord.  
+> **TL;DR:** JobClaw is an open-source AI job hunting agent. It scrapes job listings from LinkedIn, Boss直聘, and JobsDB, matches them against your profile using LLMs, auto-applies to the best fits, and notifies you of results via Telegram or Discord.  
 > You write the resume. JobClaw does the rest.
 
 ---
@@ -37,7 +37,7 @@ Your time is better spent **preparing for interviews and building skills** — n
 
 | Step | Manual | JobClaw |
 | --- | --- | --- |
-| 🔍 Find jobs | Jump between platforms, try different keywords | **Auto-scrape** LinkedIn + Boss直聘 |
+| 🔍 Find jobs | Jump between platforms, try different keywords | **Auto-scrape** LinkedIn + Boss直聘 + JobsDB |
 | 📖 Evaluate fit | Read each JD, gut-feel it | **LLM-powered matching** with scores + explanations |
 | 💬 Craft messages | Write custom intros for each role | **Auto-generated greetings** with template variables |
 | 📤 Apply | Click "Apply" 100 times | **Auto-apply** to high-match roles |
@@ -88,12 +88,32 @@ Hi! I'm very interested in the $title role at $company, $name. Would love to cha
 
 Variables: `$company`, `$title` (job title), `$name` (recruiter name)
 
+### 🌏 JobsDB Auto-Apply (Hong Kong / APAC Market)
+
+Full Quick Apply automation for the JobsDB platform:
+
+1. Search jobs → Parse listing cards
+2. Open job detail → Click "Quick Apply / Apply Now"
+3. Auto-select existing resume or upload PDF
+4. Submit application → Record history
+
+**Enhanced anti-detection measures:**
+
+- 🕶️ **Stealth mode**: Removes `navigator.webdriver` flag, spoofs `chrome.runtime`
+- 🎭 **Random fingerprint**: Different User-Agent and viewport size each session
+- 📜 **Human-like scrolling**: Randomized scroll distance + delay intervals
+- ⏱️ **Random delays**: 5-12 seconds between applications (configurable)
+- 📅 **Daily cap**: Default 50 applications/day
+- 🔄 **Dedup**: History-based duplicate prevention
+- 🤖 **CAPTCHA detection**: Auto-pauses and notifies on CAPTCHA
+- 🔀 **API fallback**: Switches to GraphQL API when DOM scraping fails
+
 ### 🍪 Cookie Management
 
 - `jobclaw login` — Opens browser for interactive login, cookies auto-saved to `~/.jobclaw/cookies/`
 - `jobclaw login --check` — Verify saved cookies are still valid
 - **Priority**: `.env` config > persisted files > prompt to re-login
-- Supports Boss直聘 + LinkedIn
+- Supports Boss直聘 + LinkedIn + JobsDB
 
 ### 🔔 Notifications
 
@@ -128,6 +148,9 @@ jobclaw login --platform linkedin
 
 # Log in to Boss直聘
 jobclaw login --platform boss
+
+# Log in to JobsDB
+jobclaw login --platform jobsdb
 
 # Log in to all platforms at once
 jobclaw login --platform all
@@ -174,6 +197,9 @@ jobclaw login --platform linkedin
 # Log in to Boss直聘
 jobclaw login --platform boss
 
+# Log in to JobsDB
+jobclaw login --platform jobsdb
+
 # Log in to all platforms
 jobclaw login --platform all
 
@@ -192,6 +218,9 @@ jobclaw scrape --platform linkedin --query "AI Engineer" --limit 20
 
 # Scrape Boss直聘
 jobclaw scrape --platform boss --query "后端工程师" --limit 20
+
+# Scrape JobsDB (Hong Kong market)
+jobclaw scrape --platform jobsdb --query "Python Developer" --limit 20
 
 # Scrape all platforms
 jobclaw scrape --platform all --query "Python Developer" --limit 30
@@ -243,12 +272,18 @@ Catch YAML errors before running the pipeline.
 | **Platform Cookies** | | | |
 | `BOSS_COOKIE` | No | - | Boss直聘 cookie (overrides saved file) |
 | `LINKEDIN_COOKIE` | No | - | LinkedIn cookie |
+| `JOBSDB_COOKIE` | No | - | JobsDB cookie (overrides saved file) |
 | **Boss直聘 Settings** | | | |
 | `BOSS_GREETING` | No | - | Greeting template (`$company` `$title` `$name`) |
 | `BOSS_APPLY_DELAY_MIN` | No | `3.0` | Min seconds between applications |
 | `BOSS_APPLY_DELAY_MAX` | No | `8.0` | Max seconds between applications |
 | `BOSS_DAILY_LIMIT` | No | `100` | Daily application cap (1-150) |
 | `BOSS_SKIP_INACTIVE_DAYS` | No | `7` | Skip jobs where HR inactive for N days |
+| **JobsDB Settings** | | | |
+| `JOBSDB_RESUME_PATH` | No | - | Path to resume PDF for auto-upload |
+| `JOBSDB_APPLY_DELAY_MIN` | No | `5.0` | Min seconds between applications |
+| `JOBSDB_APPLY_DELAY_MAX` | No | `12.0` | Max seconds between applications |
+| `JOBSDB_DAILY_LIMIT` | No | `50` | Daily application cap (1-100) |
 | **Notifications** | | | |
 | `TELEGRAM_BOT_TOKEN` | No | - | Telegram Bot token |
 | `TELEGRAM_CHAT_ID` | No | - | Telegram Chat ID |
@@ -313,7 +348,7 @@ preferences:
 +---------------------+      +----------------------+
 |   Scraper Layer     |----->| Unified Job Objects  |
 | LinkedIn / Boss直聘 |      | (Pydantic Models)    |
-+----------+----------+      +----------+-----------+
+| / JobsDB            |      +----------+-----------+
            |                            |
            v                            v
 +---------------------+      +----------------------+
@@ -325,7 +360,7 @@ preferences:
 +---------------------+      +----------------------+
 |  Auto Applier       |----->| Application Status   |
 | LinkedIn / Boss直聘 |      | Applied / Failed /   |
-+----------+----------+      | Skipped              |
+| / JobsDB            |      | Skipped              |
            |                 +----------+-----------+
            +------------+---------------+
                         v
@@ -343,6 +378,7 @@ jobclaw/
     base.py                #   Applier base class
     boss.py                #   Boss直聘 (greeting + anti-detection)
     linkedin.py            #   LinkedIn Easy Apply
+    jobsdb.py              #   JobsDB Quick Apply (anti-detection + auto resume)
     captcha.py             #   CAPTCHA detection + notification
     history.py             #   Application history (dedup)
   auth/                    # Authentication
@@ -364,6 +400,7 @@ jobclaw/
     base.py                #   Scraper base class
     boss.py                #   Boss直聘 scraper
     linkedin.py            #   LinkedIn scraper
+    jobsdb.py              #   JobsDB scraper (anti-detection + API fallback)
   cli.py                   # CLI entry point (Click)
   config.py                # Configuration (pydantic-settings)
   domain.py                # Data models (Pydantic)
@@ -381,6 +418,7 @@ tests/
 | --- | --- | --- | --- |
 | **LinkedIn** | ✅ | ✅ | Easy Apply automation |
 | **Boss直聘** (zhipin.com) | ✅ | ✅ | Playwright-simulated greeting |
+| **JobsDB** (jobsdb.com) | ✅ | ✅ | Quick Apply + auto resume (HK/APAC market) |
 | Lagou (拉勾) | 🔜 | 🔜 | Adapter in development |
 | 51Job (前程无忧) | 🔜 | 🔜 | Adapter in development |
 
@@ -390,7 +428,7 @@ tests/
 
 PRs welcome! Especially:
 
-- 🔌 **New platform adapters** (Indeed, Glassdoor, Lagou…)
+- 🔌 **New platform adapters** (Indeed, Glassdoor, Lagou, JobStreet…)
 - 🧠 **Better matching strategies** (prompt tuning, multi-dimensional scoring)
 - 🔒 **Reliability improvements** (anti-detection, checkpoint/resume)
 - 📢 **New notification channels** (Slack, WeChat, email)

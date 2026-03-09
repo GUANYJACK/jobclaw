@@ -21,7 +21,7 @@ Each stage is modular and can be extended with new platform adapters.
        ▼
 ┌─────────────┐
 │   Scraper    │  Playwright-based browser automation
-│   Layer      │  One adapter per platform (Boss/LinkedIn/...)
+│   Layer      │  One adapter per platform (Boss/LinkedIn/JobsDB/...)
 │              │  Outputs normalized Job objects
 └──────┬──────┘
        │
@@ -37,6 +37,7 @@ Each stage is modular and can be extended with new platform adapters.
 │    Auto     │  Platform-specific application flow
 │   Applier   │  Boss: "打招呼" chat initiation
 │              │  LinkedIn: Easy Apply form fill
+│              │  JobsDB: Quick Apply + auto resume selection
 └──────┬──────┘
        │
        ▼
@@ -58,17 +59,20 @@ All stages communicate through Pydantic models:
 ## Key Design Decisions
 
 1. **Playwright over API scraping** — Job sites have aggressive anti-bot, browser automation is more reliable
-2. **LLM for matching** — Rules-based matching is too rigid; LLM understands nuance (e.g. "3 years Python" ≈ "senior backend")
-3. **Async throughout** — Scraping and API calls are I/O bound, async improves throughput
-4. **Platform adapters** — Abstract base classes ensure consistent interface, easy to add new platforms
-5. **Cookie-based auth** — Simpler than OAuth, user exports cookies from their browser session
+2. **Stealth browser contexts** — Anti-detection measures (webdriver flag removal, random fingerprints) are critical for platforms like JobsDB
+3. **API fallback** — When DOM scraping fails (e.g. layout changes), fall back to internal GraphQL/REST APIs
+4. **LLM for matching** — Rules-based matching is too rigid; LLM understands nuance (e.g. "3 years Python" ≈ "senior backend")
+5. **Async throughout** — Scraping and API calls are I/O bound, async improves throughput
+6. **Platform adapters** — Abstract base classes ensure consistent interface, easy to add new platforms
+7. **Cookie-based auth** — Simpler than OAuth, user exports cookies from their browser session
 
 ## Adding a New Platform
 
 1. Create `jobclaw/scraper/newplatform.py` extending `BaseScraper`
 2. Create `jobclaw/applier/newplatform.py` extending `BaseApplier`
-3. Add new `JobSource` enum value in `models.py`
-4. Register in `cli.py`
+3. Add new `JobSource` enum value in `domain.py`
+4. Add platform config in `auth/browser_login.py` and `auth/cookie_manager.py`
+5. Register in `cli.py`
 
 ## Security Considerations
 
