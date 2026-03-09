@@ -6,8 +6,18 @@ import json
 import logging
 from pathlib import Path
 
-from langchain.chat_models import init_chat_model
-from langchain.schema import HumanMessage, SystemMessage
+try:
+    from langchain.chat_models import init_chat_model
+except ImportError:
+    try:
+        from langchain_community.chat_models import init_chat_model
+    except ImportError:
+        init_chat_model = None  # type: ignore[assignment,misc]
+
+try:
+    from langchain_core.messages import HumanMessage, SystemMessage
+except ImportError:
+    from langchain.schema import HumanMessage, SystemMessage  # type: ignore[no-redef]
 
 from jobclaw.config import get_settings
 from jobclaw.models import Job, Match, Profile
