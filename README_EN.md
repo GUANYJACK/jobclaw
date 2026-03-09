@@ -169,6 +169,16 @@ Edit `.env` with your settings (see [Configuration](#%EF%B8%8F-configuration) be
 
 ### 5. Set Up Your Profile
 
+**Option A: AI-guided (recommended)**
+
+```bash
+jobclaw init-profile
+```
+
+Answer 13 simple questions and AI generates your profile automatically.
+
+**Option B: Manual editing**
+
 ```bash
 cp profiles/example.yaml profiles/me.yaml
 ```
@@ -240,6 +250,18 @@ jobclaw run --platform linkedin --profile profiles/me.yaml --query "ML Engineer"
 # All platforms
 jobclaw run --platform all --profile profiles/me.yaml --query "Backend Developer" --limit 50
 ```
+
+### `jobclaw init-profile` — AI-Guided Profile Builder
+
+```bash
+# Interactive Q&A, AI generates profile
+jobclaw init-profile
+
+# Specify output path
+jobclaw init-profile -o profiles/custom.yaml
+```
+
+Answer 13 questions (name, skills, salary expectations, etc.) and AI generates a validated YAML profile. Built-in validation and auto-correction ensures the output is always valid.
 
 ### `jobclaw validate-profile` — Validate Profile YAML
 

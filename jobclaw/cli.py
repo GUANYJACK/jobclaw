@@ -47,6 +47,19 @@ def validate_profile_command(profile_path: Path) -> None:
     click.echo(f"Profile OK: {profile.name} ({len(profile.skills)} skills)")
 
 
+@main.command("init-profile")
+@click.option(
+    "--output", "-o",
+    default="profiles/me.yaml",
+    show_default=True,
+    help="Output path for the generated profile YAML.",
+)
+def init_profile_command(output: str) -> None:
+    """Interactive profile builder — answer questions, AI generates your profile."""
+    from jobclaw.profile.builder import interactive_profile_builder
+    asyncio.run(interactive_profile_builder(output_path=output))
+
+
 @main.command("scrape")
 @click.option("--platform", type=click.Choice(["boss", "linkedin", "jobsdb", "all"]), default="all")
 @click.option("--query", required=True, help="Search query, e.g. 'Python Engineer'.")
