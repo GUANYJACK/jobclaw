@@ -160,6 +160,17 @@ class JobsDBScraper(BaseScraper):
                     logger.warning("Failed to parse JobsDB card: %s", e)
                     continue
 
+            # Fetch full job descriptions from detail pages
+            for i, job in enumerate(jobs):
+                try:
+                    detail = await self._fetch_job_detail(context, str(job.url))
+                    if detail:
+                        job.description = detail
+                        logger.info("Fetched detail %d/%d: %s", i + 1, len(jobs), job.title)
+                    await self._human_delay(1.0, 2.5)
+                except Exception as e:
+                    logger.warning("Failed to fetch detail for %s: %s", job.url, e)
+
         except Exception as e:
             logger.error("JobsDB scrape failed: %s", e)
             # Try fallback: API-based scraping
@@ -308,6 +319,59 @@ class JobsDBScraper(BaseScraper):
             scroll_amount = random.randint(300, 700)
             await page.evaluate(f"window.scrollBy(0, {scroll_amount})")
             await asyncio.sleep(random.uniform(0.8, 2.0))
+
+    @staticmethod
+    async def _human_delay(lo: float = 0.5, hi: float = 1.5) -> None:
+        """Sleep for a random duration to mimic human browsing."""
+        import asyncio
+        await asyncio.sleep(random.uniform(lo, hi))
+
+    @staticmethod
+    async def _fetch_job_detail(context: BrowserContext, url: str) -> str | None:
+        """Open a job detail page and extract the full description from jobAdDetails.
+
+        Args:
+            context: Playwright BrowserContext (reuses cookies/stealth).
+            url: The job detail page URL.
+
+        Returns:
+            Full job description text, or None if extraction failed.
+        """
+        page = await context.new_page()
+        try:
+            await page.goto(url, wait_until="domcontentloaded", timeout=30_000)
+
+            # Wait for the job details section
+            detail_el = None
+            selectors = [
+                '[data-automation="jobAdDetails"]',
+                '[data-automation="jobDescription"]',
+                '.job-description',
+                'div[class*="jobAdDetails"]',
+            ]
+
+            for sel in selectors:
+                try:
+                    await page.wait_for_selector(sel, timeout=8_000)
+                    detail_el = await page.query_selector(sel)
+                    if detail_el:
+                        break
+                except Exception:
+                    continue
+
+            if not detail_el:
+                logger.debug("jobAdDetails not found for %s", url)
+                return None
+
+            # Get the full text content
+            text = await detail_el.inner_text()
+            return text.strip() if text else None
+
+        except Exception as e:
+            logger.warning("Failed to fetch job detail from %s: %s", url, e)
+            return None
+        finally:
+            await page.close()
 
 
 def _parse_jobsdb_salary(text: str) -> SalaryRange | None:
