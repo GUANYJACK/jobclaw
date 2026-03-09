@@ -71,16 +71,41 @@ async def interactive_login(platform: str, timeout_minutes: int = 5) -> dict:
     deadline = time.monotonic() + timeout_minutes * 60
 
     async with async_playwright() as pw:
-        browser = await pw.chromium.launch(headless=False)
-        context = await browser.new_context()
-        page = await context.new_page()
+        # Use persistent context with user data dir to appear as a real browser.
+        # This avoids "unsafe browser" detection by Google OAuth / JobsDB.
+        user_data_dir = str(COOKIE_DIR.parent / "browser_profiles" / platform)
+        Path(user_data_dir).mkdir(parents=True, exist_ok=True)
+
+        context = await pw.chromium.launch_persistent_context(
+            user_data_dir=user_data_dir,
+            headless=False,
+            channel="chrome",  # Use system Chrome instead of bundled Chromium
+            args=[
+                "--disable-blink-features=AutomationControlled",
+                "--disable-infobars",
+                "--no-first-run",
+                "--no-default-browser-check",
+            ],
+            ignore_default_args=["--enable-automation"],
+            viewport={"width": 1280, "height": 900},
+            locale="en-HK",
+            timezone_id="Asia/Hong_Kong",
+        )
+
+        # Remove webdriver flag
+        await context.add_init_script("""
+            Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
+            delete navigator.__proto__.webdriver;
+        """)
+
+        page = context.pages[0] if context.pages else await context.new_page()
 
         logger.info("Navigating to %s login page: %s", platform, config["login_url"])
         try:
             await page.goto(config["login_url"], wait_until="domcontentloaded", timeout=30_000)
         except Exception as e:
             logger.error("Failed to load login page: %s", e)
-            await browser.close()
+            await context.close()
             raise
 
         logger.info("Waiting for manual login (timeout=%dm)...", timeout_minutes)
@@ -120,7 +145,7 @@ async def interactive_login(platform: str, timeout_minutes: int = 5) -> dict:
 
         if not login_detected:
             try:
-                await browser.close()
+                await context.close()
             except Exception:
                 pass
             raise TimeoutError(
@@ -145,7 +170,7 @@ async def interactive_login(platform: str, timeout_minutes: int = 5) -> dict:
             platform, len(all_cookies), len(key_cookies),
         )
 
-        await browser.close()
+        await context.close()
 
     return key_cookies
 
