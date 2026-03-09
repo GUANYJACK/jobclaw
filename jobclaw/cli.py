@@ -52,10 +52,11 @@ def validate_profile_command(profile_path: Path) -> None:
 @click.option("--query", required=True, help="Search query, e.g. 'Python Engineer'.")
 @click.option("--location", default=None, help="Optional location filter.")
 @click.option("--limit", default=20, show_default=True, type=int)
-def scrape_command(platform: str, query: str, location: str | None, limit: int) -> None:
+@click.option("--output", "-o", default=None, type=click.Path(), help="Save results to JSON file.")
+def scrape_command(platform: str, query: str, location: str | None, limit: int, output: str | None) -> None:
     """Scrape jobs from selected platforms and print a summary."""
 
-    asyncio.run(_scrape(platform=platform, query=query, location=location, limit=limit))
+    asyncio.run(_scrape(platform=platform, query=query, location=location, limit=limit, output=output))
 
 
 @main.command("run")
@@ -143,8 +144,10 @@ async def _login(platforms: list[str], timeout: int, check_only: bool) -> None:
             click.echo(click.style(f"[{plat}] ❌ Login failed: {e}", fg="red"))
 
 
-async def _scrape(platform: str, query: str, location: str | None, limit: int) -> None:
+async def _scrape(platform: str, query: str, location: str | None, limit: int, output: str | None = None) -> None:
     """Internal async scrape workflow."""
+
+    import json as _json
 
     settings = get_settings()
     scrapers = []
@@ -159,14 +162,41 @@ async def _scrape(platform: str, query: str, location: str | None, limit: int) -
         click.echo("No scraper configured for requested platform.")
         return
 
-    total_jobs = 0
+    all_jobs = []
     for scraper in scrapers:
         async with scraper:
             jobs = await scraper.scrape_jobs(query=query, location=location, limit=limit)
-            total_jobs += len(jobs)
+            all_jobs.extend(jobs)
             click.echo(f"{scraper.source.value}: scraped {len(jobs)} job(s)")
 
-    click.echo(f"Total scraped jobs: {total_jobs} | Headless={settings.jobclaw_headless}")
+    click.echo(f"\nTotal scraped jobs: {len(all_jobs)} | Headless={settings.jobclaw_headless}")
+
+    # Print job details
+    if all_jobs:
+        click.echo(f"\n{'='*80}")
+        for i, job in enumerate(all_jobs, 1):
+            salary_str = ""
+            if job.salary:
+                lo = f"{job.salary.min_annual:,}" if job.salary.min_annual else "?"
+                hi = f"{job.salary.max_annual:,}" if job.salary.max_annual else "?"
+                salary_str = f" | 💰 {lo}-{hi} {job.salary.currency}"
+            click.echo(
+                f"\n[{i}] {job.title}\n"
+                f"    🏢 {job.company} | 📍 {job.location}{salary_str}\n"
+                f"    🔗 {job.url}"
+            )
+            if job.tags:
+                click.echo(f"    🏷️  {', '.join(job.tags)}")
+            if job.description:
+                desc_preview = job.description[:150].replace('\n', ' ')
+                click.echo(f"    📝 {desc_preview}...")
+        click.echo(f"\n{'='*80}")
+
+    # Save to JSON if --output specified
+    if output and all_jobs:
+        data = [job.model_dump(mode="json") for job in all_jobs]
+        Path(output).write_text(_json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+        click.echo(f"\n💾 Results saved to {output}")
 
 
 async def _run_pipeline(
