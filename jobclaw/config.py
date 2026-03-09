@@ -49,6 +49,16 @@ class Settings(BaseSettings):
     telegram_chat_id: str | None = None
     discord_webhook_url: str | None = None
 
+    # JobsDB
+    jobsdb_cookie: str | None = None
+    jobsdb_resume_path: str | None = Field(
+        default=None,
+        description="Path to resume file (PDF) for JobsDB auto-upload.",
+    )
+    jobsdb_apply_delay_min: float = Field(default=5.0, ge=1.0)
+    jobsdb_apply_delay_max: float = Field(default=12.0, ge=2.0)
+    jobsdb_daily_limit: int = Field(default=50, ge=1, le=100)
+
     http_proxy: str | None = None
     https_proxy: str | None = None
 

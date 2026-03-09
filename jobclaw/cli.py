@@ -8,6 +8,7 @@ from pathlib import Path
 import click
 
 from jobclaw.applier.boss import BossApplier
+from jobclaw.applier.jobsdb import JobsDBApplier
 from jobclaw.auth.browser_login import (
     PLATFORM_CONFIG,
     cookies_valid,
@@ -22,6 +23,7 @@ from jobclaw.notifier.discord import DiscordNotifier
 from jobclaw.notifier.telegram import TelegramNotifier
 from jobclaw.profile.loader import load_profile
 from jobclaw.scraper.boss import BossScraper
+from jobclaw.scraper.jobsdb import JobsDBScraper
 from jobclaw.scraper.linkedin import LinkedInScraper
 
 
@@ -46,7 +48,7 @@ def validate_profile_command(profile_path: Path) -> None:
 
 
 @main.command("scrape")
-@click.option("--platform", type=click.Choice(["boss", "linkedin", "all"]), default="all")
+@click.option("--platform", type=click.Choice(["boss", "linkedin", "jobsdb", "all"]), default="all")
 @click.option("--query", required=True, help="Search query, e.g. 'Python Engineer'.")
 @click.option("--location", default=None, help="Optional location filter.")
 @click.option("--limit", default=20, show_default=True, type=int)
@@ -57,7 +59,7 @@ def scrape_command(platform: str, query: str, location: str | None, limit: int) 
 
 
 @main.command("run")
-@click.option("--platform", type=click.Choice(["boss", "linkedin", "all"]), default="all")
+@click.option("--platform", type=click.Choice(["boss", "linkedin", "jobsdb", "all"]), default="all")
 @click.option("--query", required=True, help="Search query, e.g. 'AI Engineer'.")
 @click.option("--location", default=None, help="Optional location filter.")
 @click.option(
@@ -90,7 +92,7 @@ def run_command(
 @main.command("login")
 @click.option(
     "--platform",
-    type=click.Choice(["boss", "linkedin", "all"]),
+    type=click.Choice(["boss", "linkedin", "jobsdb", "all"]),
     default="boss",
     show_default=True,
     help="Platform to log in to.",
@@ -150,6 +152,8 @@ async def _scrape(platform: str, query: str, location: str | None, limit: int) -
         scrapers.append(BossScraper(settings))
     if platform in {"linkedin", "all"}:
         scrapers.append(LinkedInScraper(settings))
+    if platform in {"jobsdb", "all"}:
+        scrapers.append(JobsDBScraper(settings))
 
     if not scrapers:
         click.echo("No scraper configured for requested platform.")
@@ -183,6 +187,8 @@ async def _run_pipeline(
         scrapers.append(BossScraper(settings))
     if platform in {"linkedin", "all"}:
         scrapers.append(LinkedInScraper(settings))
+    if platform in {"jobsdb", "all"}:
+        scrapers.append(JobsDBScraper(settings))
 
     jobs = []
     for scraper in scrapers:
@@ -203,6 +209,7 @@ async def _run_pipeline(
 
     boss_applier = BossApplier(settings)
     linkedin_applier = LinkedInApplier(settings)
+    jobsdb_applier = JobsDBApplier(settings)
 
     applications = []
     for job in jobs:
@@ -216,6 +223,9 @@ async def _run_pipeline(
         elif job.source == JobSource.LINKEDIN:
             async with linkedin_applier:
                 applications.append(await linkedin_applier.apply(job=job, profile=profile))
+        elif job.source == JobSource.JOBSDB:
+            async with jobsdb_applier:
+                applications.append(await jobsdb_applier.apply(job=job, profile=profile))
 
     click.echo(f"Applications attempted: {len(applications)}")
 

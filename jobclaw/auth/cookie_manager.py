@@ -15,12 +15,14 @@ logger = logging.getLogger(__name__)
 _PLATFORM_COOKIE_ATTR = {
     "boss": "boss_cookie",
     "linkedin": "linkedin_cookie",
+    "jobsdb": "jobsdb_cookie",
 }
 
 # Maps platform name to the cookie name + domain used for injection
 _PLATFORM_COOKIE_META = {
     "boss": {"name": "wt2", "domain": ".zhipin.com", "path": "/"},
     "linkedin": {"name": "li_at", "domain": ".linkedin.com", "path": "/"},
+    "jobsdb": {"name": "JobseekerSessionId", "domain": ".jobsdb.com", "path": "/"},
 }
 
 

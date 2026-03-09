@@ -38,6 +38,15 @@ PLATFORM_CONFIG: dict[str, dict] = {
         "check_url": "https://www.linkedin.com/feed/",
         "check_redirect_pattern": "/login",
     },
+    "jobsdb": {
+        "login_url": "https://hk.jobsdb.com/login",
+        "success_indicator": "/profile",
+        "success_selectors": [".user-menu", "[data-automation='headerProfile']", ".logged-in"],
+        "domain": ".jobsdb.com",
+        "key_cookies": ["JobseekerSessionId", "sol"],
+        "check_url": "https://hk.jobsdb.com/profile/",
+        "check_redirect_pattern": "/login",
+    },
 }
 
 

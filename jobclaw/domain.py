@@ -16,6 +16,7 @@ class JobSource(str, Enum):
     BOSS = "boss"
     LINKEDIN = "linkedin"
     LAGOU = "lagou"
+    JOBSDB = "jobsdb"
 
 
 class ApplicationStatus(str, Enum):
