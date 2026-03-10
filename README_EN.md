@@ -54,15 +54,16 @@ Your time is better spent **preparing for interviews and building skills** — n
 
 Not simple keyword matching — JobClaw uses large language models to understand your background and job requirements, producing **match scores with explanations**.
 
-**Three authentication methods (in priority order):**
+**Four authentication methods (in priority order):**
 
 | Priority | Method | Cost | Notes |
 |----------|--------|------|-------|
 | 🥇 | **Claude OAuth** | **Free** | Piggyback on your Claude Code subscription — zero API cost! |
-| 🥈 | Anthropic API Key | Pay-per-use | Direct Claude API calls |
-| 🥉 | OpenAI API Key | Pay-per-use | GPT model family |
+| 🥈 | **GitHub Copilot** | **Free** | Piggyback on your Copilot subscription — zero API cost! |
+| 🥉 | Anthropic API Key | Pay-per-use | Direct Claude API calls |
+| 4️⃣ | OpenAI API Key | Pay-per-use | GPT model family |
 
-> 💡 **Cost-saving tip:** If you have a Claude Code subscription ($20/month), JobClaw can reuse your OAuth token to call Claude — **no additional API cost whatsoever**. Tokens auto-refresh before expiry. Completely seamless.
+> 💡 **Cost-saving tip:** If you have a Claude Code subscription ($20/month) or GitHub Copilot subscription ($10/month), JobClaw can reuse your OAuth token — **no additional API cost whatsoever**. Tokens auto-refresh before expiry.
 
 ### 📮 Boss直聘 Auto-Apply (China Market)
 
@@ -152,6 +153,9 @@ jobclaw login --platform boss
 # Log in to JobsDB
 jobclaw login --platform jobsdb
 
+# Log in to GitHub Copilot (device code auth, no browser needed)
+jobclaw login --platform copilot
+
 # Log in to all platforms at once
 jobclaw login --platform all
 
@@ -209,6 +213,9 @@ jobclaw login --platform boss
 
 # Log in to JobsDB
 jobclaw login --platform jobsdb
+
+# Log in to GitHub Copilot (device code flow)
+jobclaw login --platform copilot
 
 # Log in to all platforms
 jobclaw login --platform all
@@ -291,6 +298,8 @@ Catch YAML errors before running the pipeline.
 | `ANTHROPIC_API_KEY` | No | - | Anthropic API key |
 | `OPENAI_API_KEY` | No | - | OpenAI API key |
 | `JOBCLAW_LLM_MODEL` | No | `gpt-4o-mini` | Model for OpenAI |
+| **GitHub Copilot** | | | |
+| `COPILOT_MODEL` | No | `gpt-4o` | Model for Copilot Chat API |
 | **Platform Cookies** | | | |
 | `BOSS_COOKIE` | No | - | Boss直聘 cookie (overrides saved file) |
 | `LINKEDIN_COOKIE` | No | - | LinkedIn cookie |
@@ -314,7 +323,10 @@ Catch YAML errors before running the pipeline.
 | `HTTP_PROXY` | No | - | HTTP proxy |
 | `HTTPS_PROXY` | No | - | HTTPS proxy |
 
-> 🆓 **Claude OAuth (Zero-Cost LLM):** Install Claude Code CLI (`npm i -g @anthropic-ai/claude-code`), log in with your subscription, and JobClaw auto-detects `~/.claude/.credentials.json`. **No API key needed, no extra cost.** Token auto-refreshes before expiry.
+> 🆓 **Zero-Cost LLM Options:**
+> - **Claude OAuth:** Install Claude Code CLI (`npm i -g @anthropic-ai/claude-code`), log in, and JobClaw auto-detects your OAuth token.
+> - **GitHub Copilot:** Run `jobclaw login --platform copilot`, authorize with your GitHub account, and use your Copilot subscription.
+> Both options: **no API key needed, zero extra cost.**
 
 ### `profiles/me.yaml` — Job Seeker Profile
 

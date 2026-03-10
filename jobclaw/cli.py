@@ -106,7 +106,7 @@ def run_command(
 @main.command("login")
 @click.option(
     "--platform",
-    type=click.Choice(["boss", "linkedin", "jobsdb", "all"]),
+    type=click.Choice(["boss", "linkedin", "jobsdb", "copilot", "all"]),
     default="boss",
     show_default=True,
     help="Platform to log in to.",
@@ -115,8 +115,35 @@ def run_command(
 @click.option("--check", is_flag=True, help="Only check if existing cookies are valid.")
 def login_command(platform: str, timeout: int, check: bool) -> None:
     """Interactive browser login to save cookies."""
-    platforms = list(PLATFORM_CONFIG.keys()) if platform == "all" else [platform]
+    if platform == "copilot":
+        asyncio.run(_login_copilot(timeout))
+        return
+    if platform == "all":
+        platforms = list(PLATFORM_CONFIG.keys())
+        asyncio.run(_login(platforms=platforms, timeout=timeout, check_only=check))
+        # Also offer Copilot login
+        if not check and click.confirm("\nAlso log in to GitHub Copilot?", default=False):
+            asyncio.run(_login_copilot(timeout))
+        return
+    platforms = [platform]
     asyncio.run(_login(platforms=platforms, timeout=timeout, check_only=check))
+
+
+async def _login_copilot(timeout: int) -> None:
+    """GitHub Copilot device flow login."""
+    from jobclaw.auth.copilot_auth import device_flow_login, load_github_token
+
+    existing = load_github_token()
+    if existing:
+        click.echo("ℹ️  Existing GitHub Copilot token found.")
+        if not click.confirm("Re-authenticate?", default=False):
+            click.echo("Using existing token.")
+            return
+
+    try:
+        await device_flow_login(timeout_minutes=timeout)
+    except (TimeoutError, RuntimeError) as e:
+        click.echo(click.style(f"❌ Copilot login failed: {e}", fg="red"))
 
 
 async def _login(platforms: list[str], timeout: int, check_only: bool) -> None:

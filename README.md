@@ -55,15 +55,16 @@
 
 不是简单的关键词匹配，而是用大模型理解你的背景和岗位要求，给出**匹配分数 + 匹配理由**。
 
-**三种 LLM 认证方式（优先级递减）：**
+**四种 LLM 认证方式（优先级递减）：**
 
 | 优先级 | 方式 | 费用 | 说明 |
 |--------|------|------|------|
 | 🥇 | **Claude OAuth** | **免费** | 白嫖 Claude Code 订阅额度，零 API 费用！ |
-| 🥈 | Anthropic API Key | 按量付费 | 直接调用 Claude API |
-| 🥉 | OpenAI API Key | 按量付费 | 调用 GPT 系列模型 |
+| 🥈 | **GitHub Copilot** | **免费** | 白嫖 Copilot 订阅额度，零 API 费用！ |
+| 🥉 | Anthropic API Key | 按量付费 | 直接调用 Claude API |
+| 4️⃣ | OpenAI API Key | 按量付费 | 调用 GPT 系列模型 |
 
-> 💡 **省钱秘籍：** 如果你有 Claude Code 订阅（$20/月），JobClaw 可以直接复用你的 OAuth token 调用 Claude，**不额外花一分钱**。Token 过期会自动刷新，完全无感。
+> 💡 **省钱秘籍：** 如果你有 Claude Code 订阅（$20/月）或 GitHub Copilot 订阅（$10/月），JobClaw 可以直接复用你的 OAuth token 调用 LLM，**不额外花一分钱**。Token 过期会自动刷新，完全无感。
 
 ### 📮 Boss直聘自动投递（核心卖点）
 
@@ -153,6 +154,9 @@ jobclaw login --platform linkedin
 # 登录 JobsDB
 jobclaw login --platform jobsdb
 
+# 登录 GitHub Copilot（设备码认证）
+jobclaw login --platform copilot
+
 # 一次性登录所有平台
 jobclaw login --platform all
 
@@ -210,6 +214,9 @@ jobclaw login --platform linkedin
 
 # 登录 JobsDB
 jobclaw login --platform jobsdb
+
+# 登录 GitHub Copilot（设备码认证，无需浏览器）
+jobclaw login --platform copilot
 
 # 登录所有支持的平台
 jobclaw login --platform all
@@ -292,6 +299,8 @@ jobclaw validate-profile --profile profiles/me.yaml
 | `ANTHROPIC_API_KEY` | 否 | - | Anthropic API Key |
 | `OPENAI_API_KEY` | 否 | - | OpenAI API Key |
 | `JOBCLAW_LLM_MODEL` | 否 | `gpt-4o-mini` | OpenAI 使用的模型 |
+| **GitHub Copilot** | | | |
+| `COPILOT_MODEL` | 否 | `gpt-4o` | Copilot Chat 使用的模型 |
 | **平台 Cookie** | | | |
 | `BOSS_COOKIE` | 否 | - | Boss直聘 cookie（优先于持久化文件） |
 | `LINKEDIN_COOKIE` | 否 | - | LinkedIn cookie |
@@ -315,7 +324,10 @@ jobclaw validate-profile --profile profiles/me.yaml
 | `HTTP_PROXY` | 否 | - | HTTP 代理 |
 | `HTTPS_PROXY` | 否 | - | HTTPS 代理 |
 
-> 🆓 **Claude OAuth 零成本方案：** 安装 Claude Code CLI（`npm i -g @anthropic-ai/claude-code`）并登录你的订阅账号，JobClaw 会自动检测 `~/.claude/.credentials.json` 中的 OAuth token，**无需任何 API Key，零额外费用**。Token 过期前会自动刷新。
+> 🆓 **零成本 LLM 方案：**
+> - **Claude OAuth：** 安装 Claude Code CLI（`npm i -g @anthropic-ai/claude-code`）并登录，JobClaw 自动检测 OAuth token。
+> - **GitHub Copilot：** 运行 `jobclaw login --platform copilot`，用 GitHub 账号授权，直接使用 Copilot 订阅额度。
+> 两种方式都**无需 API Key，零额外费用**。
 
 ### `profiles/me.yaml` 求职画像
 

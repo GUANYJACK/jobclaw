@@ -34,6 +34,9 @@ class Settings(BaseSettings):
         default="claude-sonnet-4-6", alias="CLAUDE_MODEL",
     )
 
+    # GitHub Copilot
+    copilot_model: str = Field(default="gpt-4o", alias="COPILOT_MODEL")
+
     boss_cookie: str | None = None
     boss_greeting: str | None = Field(
         default=None,

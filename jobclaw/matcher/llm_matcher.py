@@ -38,12 +38,12 @@ Return ONLY valid JSON, no markdown."""
 def _resolve_llm_backend() -> tuple[str, str | None]:
     """Determine which LLM backend to use.
 
-    Priority: Claude OAuth > ANTHROPIC_API_KEY > OPENAI_API_KEY
+    Priority: Claude OAuth > GitHub Copilot > ANTHROPIC_API_KEY > OPENAI_API_KEY
 
     Returns
     -------
     (backend, model_name) where backend is one of
-    ``"claude-oauth"``, ``"anthropic"``, ``"openai"``.
+    ``"claude-oauth"``, ``"copilot"``, ``"anthropic"``, ``"openai"``.
     """
     settings = get_settings()
 
@@ -55,7 +55,12 @@ def _resolve_llm_backend() -> tuple[str, str | None]:
     if creds_path.exists():
         return "claude-oauth", settings.claude_model
 
-    # 2. Anthropic API key
+    # 2. GitHub Copilot token
+    from jobclaw.auth.copilot_auth import load_github_token
+    if load_github_token():
+        return "copilot", getattr(settings, "copilot_model", "gpt-4o")
+
+    # 3. Anthropic API key
     if settings.anthropic_api_key:
         return "anthropic", settings.claude_model
 
@@ -68,17 +73,19 @@ class LLMMatcher:
 
     Authentication priority:
       1. Claude OAuth (``~/.claude/.credentials.json`` from Claude Code CLI)
-      2. ``ANTHROPIC_API_KEY`` (regular Anthropic API key)
-      3. ``OPENAI_API_KEY`` (OpenAI, default fallback)
+      2. GitHub Copilot (``~/.jobclaw/auth/copilot.json``)
+      3. ``ANTHROPIC_API_KEY`` (regular Anthropic API key)
+      4. ``OPENAI_API_KEY`` (OpenAI, default fallback)
     """
 
     def __init__(self, model_name: str | None = None) -> None:
         self._backend, default_model = _resolve_llm_backend()
         self._model_name = model_name or default_model or "gpt-4o-mini"
 
-        # For Claude OAuth we use the custom streaming client; for
+        # For Claude OAuth / Copilot we use custom clients; for
         # standard API keys we use LangChain's init_chat_model.
         self._claude_client = None
+        self._copilot_client = None
         self._llm = None
 
         if self._backend == "claude-oauth":
@@ -105,6 +112,10 @@ class LLMMatcher:
                 self._model_name,
                 token.rate_limit_tier or "unknown",
             )
+        elif self._backend == "copilot":
+            from jobclaw.models.copilot_api import CopilotClient
+            self._copilot_client = CopilotClient(model=self._model_name)
+            logger.info("Using GitHub Copilot (%s)", self._model_name)
         elif self._backend == "anthropic":
             self._llm = init_chat_model(
                 self._model_name, model_provider="anthropic",
@@ -129,6 +140,10 @@ class LLMMatcher:
         try:
             if self._claude_client is not None:
                 raw = await self._claude_client.chat(
+                    prompt, system=SYSTEM_PROMPT,
+                )
+            elif self._copilot_client is not None:
+                raw = await self._copilot_client.chat(
                     prompt, system=SYSTEM_PROMPT,
                 )
             else:

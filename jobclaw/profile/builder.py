@@ -192,6 +192,11 @@ async def _call_llm(system: str, user: str) -> str:
         client = ClaudeClient(token=token, model=model_name or settings.claude_model)
         return await client.chat(user, system=system)
 
+    if backend == "copilot":
+        from jobclaw.models.copilot_api import CopilotClient
+        client = CopilotClient(model=model_name or settings.copilot_model)
+        return await client.chat(user, system=system)
+
     # LangChain path
     try:
         from langchain_core.messages import HumanMessage, SystemMessage
