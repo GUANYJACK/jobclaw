@@ -225,20 +225,33 @@ async def _check_llm_status() -> None:
 
 
 async def _login_copilot(timeout: int) -> None:
-    """GitHub Copilot device flow login."""
-    from jobclaw.auth.copilot_auth import device_flow_login, load_github_token
+    """GitHub Copilot login — try VS Code extraction, then manual input."""
+    from jobclaw.auth.copilot_auth import login_interactive, load_github_token
 
     existing = load_github_token()
     if existing:
-        click.echo("ℹ️  Existing GitHub Copilot token found.")
+        click.echo(f"ℹ️  Existing GitHub Copilot token found ({existing[:8]}...{existing[-4:]})")
         if not click.confirm("Re-authenticate?", default=False):
             click.echo("Using existing token.")
             return
 
+    token = login_interactive()
+    if not token:
+        click.echo(click.style("❌ No token obtained.", fg="red"))
+        return
+
+    # Validate by trying to get Copilot token
+    click.echo("\n🔄 Validating token with Copilot API...")
     try:
-        await device_flow_login(timeout_minutes=timeout)
-    except (TimeoutError, RuntimeError) as e:
-        click.echo(click.style(f"❌ Copilot login failed: {e}", fg="red"))
+        from jobclaw.auth.copilot_auth import get_copilot_token
+        ct = await get_copilot_token(token)
+        if ct.copilot_token:
+            click.echo(click.style("✅ Copilot token exchange successful!", fg="green"))
+        else:
+            click.echo(click.style("⚠️ Token saved but Copilot exchange returned empty.", fg="yellow"))
+    except RuntimeError as e:
+        click.echo(click.style(f"⚠️ Token saved but validation failed:\n{e}", fg="yellow"))
+        click.echo("You may need a different token. See the instructions above.")
 
 
 async def _login(platforms: list[str], timeout: int, check_only: bool) -> None:
