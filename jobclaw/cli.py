@@ -188,10 +188,13 @@ async def _check_llm_status() -> None:
             if resp2.status_code == 200:
                 click.echo("    Copilot subscription: ✅ Active")
             elif resp2.status_code == 403:
-                click.echo("    Copilot subscription: ❌ No active subscription!")
+                click.echo("    Copilot subscription: ❌ 403 Forbidden")
+                click.echo(f"    Response: {resp2.text[:300]}")
+                click.echo("    → This may be an OAuth scope/client_id issue")
                 click.echo("    → Check: https://github.com/settings/copilot")
             else:
-                click.echo(f"    Copilot subscription: ⚠️ Unknown (status {resp2.status_code})")
+                click.echo(f"    Copilot subscription: ⚠️ Status {resp2.status_code}")
+                click.echo(f"    Response: {resp2.text[:300]}")
         except Exception as e:
             click.echo(f"    ⚠️ Network error: {e}")
     else:

@@ -26,7 +26,7 @@ _COPILOT_CHAT_URL = "https://api.githubcopilot.com/chat/completions"
 _CREDENTIALS_DIR = Path.home() / ".jobclaw" / "auth"
 _CREDENTIALS_FILE = _CREDENTIALS_DIR / "copilot.json"
 
-_SCOPES = "read:user"
+_SCOPES = ""
 
 
 class CopilotToken:
@@ -192,9 +192,12 @@ async def get_copilot_token(github_token: str | None = None) -> CopilotToken:
                 "Run: jobclaw login-llm --provider copilot"
             )
         if resp.status_code == 403:
+            detail = resp.text[:500] if resp.text else "No details"
             raise RuntimeError(
-                "No GitHub Copilot subscription found for this account. "
-                "Make sure you have an active Copilot Individual or Business subscription."
+                f"Copilot token exchange returned 403.\n"
+                f"  Response: {detail}\n"
+                f"  This usually means the OAuth app doesn't have Copilot access.\n"
+                f"  Your subscription status can be checked at: https://github.com/settings/copilot"
             )
         resp.raise_for_status()
         data = resp.json()
