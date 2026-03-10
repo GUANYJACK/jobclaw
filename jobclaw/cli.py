@@ -128,10 +128,97 @@ def login_command(platform: str, timeout: int, check: bool) -> None:
     help="LLM provider to authenticate.",
 )
 @click.option("--timeout", type=int, default=5, show_default=True, help="Login timeout in minutes.")
-def login_llm_command(provider: str, timeout: int) -> None:
+@click.option("--check", is_flag=True, help="Check current LLM authentication status.")
+def login_llm_command(provider: str, timeout: int, check: bool) -> None:
     """Authenticate with an LLM provider (e.g. GitHub Copilot)."""
+    if check:
+        asyncio.run(_check_llm_status())
+        return
     if provider == "copilot":
         asyncio.run(_login_copilot(timeout))
+
+
+async def _check_llm_status() -> None:
+    """Check all LLM backends and report status."""
+    from pathlib import Path
+    from jobclaw.config import get_settings
+    settings = get_settings()
+
+    click.echo("🔍 LLM Authentication Status\n" + "=" * 40)
+
+    # 1. Claude OAuth
+    creds_path = Path(
+        settings.claude_credentials_path
+        or (Path.home() / ".claude" / ".credentials.json")
+    )
+    if creds_path.exists():
+        from jobclaw.auth.token_refresh import ensure_valid_token
+        valid = ensure_valid_token(creds_path)
+        status = "✅ Valid" if valid else "⚠️ Expired (refresh failed)"
+        click.echo(f"  Claude OAuth: {status}")
+        click.echo(f"    Path: {creds_path}")
+    else:
+        click.echo("  Claude OAuth: ❌ Not configured")
+        click.echo(f"    (Looking for: {creds_path})")
+
+    # 2. GitHub Copilot
+    from jobclaw.auth.copilot_auth import load_github_token
+    gh_token = load_github_token()
+    if gh_token:
+        click.echo(f"  GitHub Copilot: ✅ Token found (ghu_...{gh_token[-4:]})")
+        # Try to exchange for Copilot token
+        try:
+            import httpx
+            resp = httpx.get(
+                "https://api.github.com/user",
+                headers={"Authorization": f"token {gh_token}", "Accept": "application/json"},
+                timeout=10.0,
+            )
+            if resp.status_code == 200:
+                user = resp.json()
+                click.echo(f"    GitHub user: {user.get('login', '?')}")
+            else:
+                click.echo(f"    ⚠️ Token may be invalid (status {resp.status_code})")
+
+            resp2 = httpx.get(
+                "https://api.github.com/copilot_internal/v2/token",
+                headers={"Authorization": f"token {gh_token}", "Accept": "application/json"},
+                timeout=10.0,
+            )
+            if resp2.status_code == 200:
+                click.echo("    Copilot subscription: ✅ Active")
+            elif resp2.status_code == 403:
+                click.echo("    Copilot subscription: ❌ No active subscription!")
+                click.echo("    → Check: https://github.com/settings/copilot")
+            else:
+                click.echo(f"    Copilot subscription: ⚠️ Unknown (status {resp2.status_code})")
+        except Exception as e:
+            click.echo(f"    ⚠️ Network error: {e}")
+    else:
+        click.echo("  GitHub Copilot: ❌ Not configured")
+        click.echo("    Run: jobclaw login-llm --provider copilot")
+
+    # 3. Anthropic API Key
+    if settings.anthropic_api_key:
+        masked = settings.anthropic_api_key[:8] + "..." + settings.anthropic_api_key[-4:]
+        click.echo(f"  Anthropic API Key: ✅ Set ({masked})")
+    else:
+        click.echo("  Anthropic API Key: ❌ Not set")
+
+    # 4. OpenAI API Key
+    import os
+    openai_key = os.getenv("OPENAI_API_KEY")
+    if openai_key:
+        masked = openai_key[:8] + "..." + openai_key[-4:]
+        click.echo(f"  OpenAI API Key: ✅ Set ({masked})")
+    else:
+        click.echo("  OpenAI API Key: ❌ Not set")
+
+    click.echo(f"\n{'=' * 40}")
+    # Show which backend would be used
+    from jobclaw.matcher.llm_matcher import _resolve_llm_backend
+    backend, model = _resolve_llm_backend()
+    click.echo(f"  → Active backend: {backend} (model: {model})")
 
 
 async def _login_copilot(timeout: int) -> None:
