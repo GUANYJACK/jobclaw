@@ -155,7 +155,7 @@ jobclaw login --platform linkedin
 jobclaw login --platform jobsdb
 
 # 登录 GitHub Copilot（设备码认证）
-jobclaw login --platform copilot
+jobclaw login-llm --provider copilot
 
 # 一次性登录所有平台
 jobclaw login --platform all
@@ -215,9 +215,6 @@ jobclaw login --platform linkedin
 # 登录 JobsDB
 jobclaw login --platform jobsdb
 
-# 登录 GitHub Copilot（设备码认证，无需浏览器）
-jobclaw login --platform copilot
-
 # 登录所有支持的平台
 jobclaw login --platform all
 
@@ -226,6 +223,13 @@ jobclaw login --platform boss --timeout 5
 
 # 检查 cookie 有效性（不弹浏览器）
 jobclaw login --platform boss --check
+```
+
+### `jobclaw login-llm` — 登录 LLM 服务
+
+```bash
+# 登录 GitHub Copilot（设备码认证，无需浏览器）
+jobclaw login-llm --provider copilot
 ```
 
 ### `jobclaw scrape` — 只抓取，不投递
@@ -326,7 +330,7 @@ jobclaw validate-profile --profile profiles/me.yaml
 
 > 🆓 **零成本 LLM 方案：**
 > - **Claude OAuth：** 安装 Claude Code CLI（`npm i -g @anthropic-ai/claude-code`）并登录，JobClaw 自动检测 OAuth token。
-> - **GitHub Copilot：** 运行 `jobclaw login --platform copilot`，用 GitHub 账号授权，直接使用 Copilot 订阅额度。
+> - **GitHub Copilot：** 运行 `jobclaw login-llm --provider copilot`，用 GitHub 账号授权，直接使用 Copilot 订阅额度。
 > 两种方式都**无需 API Key，零额外费用**。
 
 ### `profiles/me.yaml` 求职画像

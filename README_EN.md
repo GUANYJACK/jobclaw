@@ -154,7 +154,7 @@ jobclaw login --platform boss
 jobclaw login --platform jobsdb
 
 # Log in to GitHub Copilot (device code auth, no browser needed)
-jobclaw login --platform copilot
+jobclaw login-llm --provider copilot
 
 # Log in to all platforms at once
 jobclaw login --platform all
@@ -214,9 +214,6 @@ jobclaw login --platform boss
 # Log in to JobsDB
 jobclaw login --platform jobsdb
 
-# Log in to GitHub Copilot (device code flow)
-jobclaw login --platform copilot
-
 # Log in to all platforms
 jobclaw login --platform all
 
@@ -225,6 +222,13 @@ jobclaw login --platform linkedin --timeout 5
 
 # Check cookie validity (no browser popup)
 jobclaw login --platform linkedin --check
+```
+
+### `jobclaw login-llm` — Authenticate LLM Providers
+
+```bash
+# Log in to GitHub Copilot (device code flow, no browser needed)
+jobclaw login-llm --provider copilot
 ```
 
 ### `jobclaw scrape` — Scrape Only (No Applications)
@@ -325,7 +329,7 @@ Catch YAML errors before running the pipeline.
 
 > 🆓 **Zero-Cost LLM Options:**
 > - **Claude OAuth:** Install Claude Code CLI (`npm i -g @anthropic-ai/claude-code`), log in, and JobClaw auto-detects your OAuth token.
-> - **GitHub Copilot:** Run `jobclaw login --platform copilot`, authorize with your GitHub account, and use your Copilot subscription.
+> - **GitHub Copilot:** Run `jobclaw login-llm --provider copilot`, authorize with your GitHub account, and use your Copilot subscription.
 > Both options: **no API key needed, zero extra cost.**
 
 ### `profiles/me.yaml` — Job Seeker Profile

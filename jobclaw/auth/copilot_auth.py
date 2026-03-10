@@ -174,7 +174,7 @@ async def get_copilot_token(github_token: str | None = None) -> CopilotToken:
         github_token = load_github_token()
         if not github_token:
             raise RuntimeError(
-                "No GitHub token found. Run: jobclaw login --platform copilot"
+                "No GitHub token found. Run: jobclaw login-llm --provider copilot"
             )
 
     async with httpx.AsyncClient(timeout=30.0) as client:
@@ -189,7 +189,7 @@ async def get_copilot_token(github_token: str | None = None) -> CopilotToken:
         if resp.status_code == 401:
             raise RuntimeError(
                 "GitHub token is invalid or expired. "
-                "Run: jobclaw login --platform copilot"
+                "Run: jobclaw login-llm --provider copilot"
             )
         if resp.status_code == 403:
             raise RuntimeError(

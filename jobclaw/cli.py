@@ -106,27 +106,32 @@ def run_command(
 @main.command("login")
 @click.option(
     "--platform",
-    type=click.Choice(["boss", "linkedin", "jobsdb", "copilot", "all"]),
+    type=click.Choice(["boss", "linkedin", "jobsdb", "all"]),
     default="boss",
     show_default=True,
-    help="Platform to log in to.",
+    help="Job platform to log in to.",
 )
 @click.option("--timeout", type=int, default=5, show_default=True, help="Login timeout in minutes.")
 @click.option("--check", is_flag=True, help="Only check if existing cookies are valid.")
 def login_command(platform: str, timeout: int, check: bool) -> None:
-    """Interactive browser login to save cookies."""
-    if platform == "copilot":
-        asyncio.run(_login_copilot(timeout))
-        return
-    if platform == "all":
-        platforms = list(PLATFORM_CONFIG.keys())
-        asyncio.run(_login(platforms=platforms, timeout=timeout, check_only=check))
-        # Also offer Copilot login
-        if not check and click.confirm("\nAlso log in to GitHub Copilot?", default=False):
-            asyncio.run(_login_copilot(timeout))
-        return
-    platforms = [platform]
+    """Interactive browser login to job platforms."""
+    platforms = list(PLATFORM_CONFIG.keys()) if platform == "all" else [platform]
     asyncio.run(_login(platforms=platforms, timeout=timeout, check_only=check))
+
+
+@main.command("login-llm")
+@click.option(
+    "--provider",
+    type=click.Choice(["copilot"]),
+    default="copilot",
+    show_default=True,
+    help="LLM provider to authenticate.",
+)
+@click.option("--timeout", type=int, default=5, show_default=True, help="Login timeout in minutes.")
+def login_llm_command(provider: str, timeout: int) -> None:
+    """Authenticate with an LLM provider (e.g. GitHub Copilot)."""
+    if provider == "copilot":
+        asyncio.run(_login_copilot(timeout))
 
 
 async def _login_copilot(timeout: int) -> None:
