@@ -118,6 +118,7 @@ class LLMMatcher:
         elif self._backend == "google":
             self._llm = init_chat_model(
                 self._model_name, model_provider="google_genai",
+                google_api_key=get_settings().google_api_key,
             )
             logger.info("Using Google Gemini (%s)", self._model_name)
         else:
