@@ -330,8 +330,9 @@ class JobsDBApplier(BaseApplier):
     async def fetch_resume_list(self, apply_page_url: str | None = None) -> list[dict]:
         """Fetch the list of resumes from the user's JobsDB account.
 
-        Opens an apply page (needs login cookies) to read the resume
-        <select> dropdown options.
+        Uses a persistent browser context (same profile as login) to
+        preserve login state. Opens an apply page to read the resume
+        <select> dropdown.
 
         Args:
             apply_page_url: A specific /apply URL. If None, searches for
@@ -340,10 +341,21 @@ class JobsDBApplier(BaseApplier):
         Returns:
             List of dicts: {index, name, value}.
         """
-        if not self._browser:
+        if not self._playwright:
             raise RuntimeError("JobsDBApplier not initialised — use 'async with'.")
 
-        context = await self._browser.new_context(
+        import os
+        profile_dir = os.path.expanduser("~/.jobclaw/browser_profiles/jobsdb")
+        os.makedirs(profile_dir, exist_ok=True)
+
+        context = await self._playwright.chromium.launch_persistent_context(
+            profile_dir,
+            channel="chrome",
+            headless=False,  # need visible browser for login-state
+            args=[
+                "--disable-blink-features=AutomationControlled",
+                "--disable-dev-shm-usage",
+            ],
             user_agent=random.choice(_USER_AGENTS),
             viewport={"width": 1440, "height": 900},
             locale="en-HK",
@@ -354,13 +366,7 @@ class JobsDBApplier(BaseApplier):
             window.chrome = { runtime: {} };
         """)
 
-        try:
-            from jobclaw.auth.cookie_manager import inject_cookies
-            await inject_cookies(context, "jobsdb", self._settings)
-        except Exception as e:
-            logger.warning("Cookie injection failed: %s", e)
-
-        page = await context.new_page()
+        page = context.pages[0] if context.pages else await context.new_page()
         resumes: list[dict] = []
 
         try:
@@ -375,7 +381,18 @@ class JobsDBApplier(BaseApplier):
 
             logger.info("Opening apply page: %s", url)
             await page.goto(url, wait_until="domcontentloaded", timeout=45_000)
-            await self._human_delay(2.0, 4.0)
+
+            # Wait for the apply form to render (SPA)
+            try:
+                await page.wait_for_selector(
+                    '[data-testid="resume-method-change"], [data-testid="resume-method-upload"]',
+                    timeout=15_000,
+                )
+            except Exception:
+                logger.warning("Resume form did not appear within timeout")
+                return []
+
+            await self._human_delay(1.0, 2.0)
 
             # Click "use existing resume" radio to reveal dropdown
             change_radio = await page.query_selector('[data-testid="resume-method-change"]')

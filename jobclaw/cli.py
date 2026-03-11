@@ -55,18 +55,23 @@ def validate_profile_command(profile_path: Path) -> None:
     show_default=True,
     help="Platform to fetch resumes from.",
 )
-def resumes_command(platform: str) -> None:
+@click.option(
+    "--url",
+    default=None,
+    help="A job apply page URL (e.g. https://hk.jobsdb.com/zh/job/12345/apply).",
+)
+def resumes_command(platform: str, url: str | None) -> None:
     """List resumes saved on your job platform account."""
     if platform == "jobsdb":
-        asyncio.run(_list_resumes_jobsdb())
+        asyncio.run(_list_resumes_jobsdb(url))
 
 
-async def _list_resumes_jobsdb() -> None:
+async def _list_resumes_jobsdb(apply_url: str | None = None) -> None:
     """Fetch and display JobsDB resumes."""
     settings = get_settings()
     applier = JobsDBApplier(settings)
     async with applier:
-        resumes = await applier.fetch_resume_list()
+        resumes = await applier.fetch_resume_list(apply_url)
 
     if not resumes:
         click.echo("❌ No resumes found on your JobsDB account.")
