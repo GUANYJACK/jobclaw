@@ -120,22 +120,13 @@ def login_command(platform: str, timeout: int, check: bool) -> None:
 
 
 @main.command("login-llm")
-@click.option(
-    "--provider",
-    type=click.Choice(["copilot"]),
-    default="copilot",
-    show_default=True,
-    help="LLM provider to authenticate.",
-)
-@click.option("--timeout", type=int, default=5, show_default=True, help="Login timeout in minutes.")
 @click.option("--check", is_flag=True, help="Check current LLM authentication status.")
-def login_llm_command(provider: str, timeout: int, check: bool) -> None:
-    """Authenticate with an LLM provider (e.g. GitHub Copilot)."""
+def login_llm_command(check: bool) -> None:
+    """Check LLM authentication status."""
     if check:
         asyncio.run(_check_llm_status())
-        return
-    if provider == "copilot":
-        asyncio.run(_login_copilot(timeout))
+    else:
+        asyncio.run(_check_llm_status())
 
 
 async def _check_llm_status() -> None:
@@ -161,54 +152,14 @@ async def _check_llm_status() -> None:
         click.echo("  Claude OAuth: ❌ Not configured")
         click.echo(f"    (Looking for: {creds_path})")
 
-    # 2. GitHub Copilot
-    from jobclaw.auth.copilot_auth import load_github_token
-    gh_token = load_github_token()
-    if gh_token:
-        click.echo(f"  GitHub Copilot: ✅ Token found (ghu_...{gh_token[-4:]})")
-        # Try to exchange for Copilot token
-        try:
-            import httpx
-            resp = httpx.get(
-                "https://api.github.com/user",
-                headers={"Authorization": f"token {gh_token}", "Accept": "application/json"},
-                timeout=10.0,
-            )
-            if resp.status_code == 200:
-                user = resp.json()
-                click.echo(f"    GitHub user: {user.get('login', '?')}")
-            else:
-                click.echo(f"    ⚠️ Token may be invalid (status {resp.status_code})")
-
-            resp2 = httpx.get(
-                "https://api.github.com/copilot_internal/v2/token",
-                headers={"Authorization": f"token {gh_token}", "Accept": "application/json"},
-                timeout=10.0,
-            )
-            if resp2.status_code == 200:
-                click.echo("    Copilot subscription: ✅ Active")
-            elif resp2.status_code == 403:
-                click.echo("    Copilot subscription: ❌ 403 Forbidden")
-                click.echo(f"    Response: {resp2.text[:300]}")
-                click.echo("    → This may be an OAuth scope/client_id issue")
-                click.echo("    → Check: https://github.com/settings/copilot")
-            else:
-                click.echo(f"    Copilot subscription: ⚠️ Status {resp2.status_code}")
-                click.echo(f"    Response: {resp2.text[:300]}")
-        except Exception as e:
-            click.echo(f"    ⚠️ Network error: {e}")
-    else:
-        click.echo("  GitHub Copilot: ❌ Not configured")
-        click.echo("    Run: jobclaw login-llm --provider copilot")
-
-    # 3. Anthropic API Key
+    # 2. Anthropic API Key
     if settings.anthropic_api_key:
         masked = settings.anthropic_api_key[:8] + "..." + settings.anthropic_api_key[-4:]
         click.echo(f"  Anthropic API Key: ✅ Set ({masked})")
     else:
         click.echo("  Anthropic API Key: ❌ Not set")
 
-    # 4. OpenAI API Key
+    # 3. OpenAI API Key
     import os
     openai_key = os.getenv("OPENAI_API_KEY")
     if openai_key:
@@ -218,40 +169,9 @@ async def _check_llm_status() -> None:
         click.echo("  OpenAI API Key: ❌ Not set")
 
     click.echo(f"\n{'=' * 40}")
-    # Show which backend would be used
     from jobclaw.matcher.llm_matcher import _resolve_llm_backend
     backend, model = _resolve_llm_backend()
     click.echo(f"  → Active backend: {backend} (model: {model})")
-
-
-async def _login_copilot(timeout: int) -> None:
-    """GitHub Copilot login — try VS Code extraction, then manual input."""
-    from jobclaw.auth.copilot_auth import login_interactive, load_github_token
-
-    existing = load_github_token()
-    if existing:
-        click.echo(f"ℹ️  Existing GitHub Copilot token found ({existing[:8]}...{existing[-4:]})")
-        if not click.confirm("Re-authenticate?", default=False):
-            click.echo("Using existing token.")
-            return
-
-    token = login_interactive()
-    if not token:
-        click.echo(click.style("❌ No token obtained.", fg="red"))
-        return
-
-    # Validate by trying to get Copilot token
-    click.echo("\n🔄 Validating token with Copilot API...")
-    try:
-        from jobclaw.auth.copilot_auth import get_copilot_token
-        ct = await get_copilot_token(token)
-        if ct.copilot_token:
-            click.echo(click.style("✅ Copilot token exchange successful!", fg="green"))
-        else:
-            click.echo(click.style("⚠️ Token saved but Copilot exchange returned empty.", fg="yellow"))
-    except RuntimeError as e:
-        click.echo(click.style(f"⚠️ Token saved but validation failed:\n{e}", fg="yellow"))
-        click.echo("You may need a different token. See the instructions above.")
 
 
 async def _login(platforms: list[str], timeout: int, check_only: bool) -> None:
