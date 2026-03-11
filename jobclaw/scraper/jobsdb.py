@@ -6,7 +6,7 @@ import logging
 import random
 from typing import Self
 
-from playwright.async_api import Browser, BrowserContext, Page, Playwright, async_playwright
+from playwright.async_api import BrowserContext, Page, Playwright, async_playwright
 
 from jobclaw.models import Job, JobSource, SalaryRange
 from jobclaw.scraper.base import BaseScraper
@@ -50,47 +50,38 @@ class JobsDBScraper(BaseScraper):
     def __init__(self, settings: object) -> None:
         self._settings = settings
         self._playwright: Playwright | None = None
-        self._browser: Browser | None = None
+        self._context: BrowserContext | None = None
 
     async def __aenter__(self) -> Self:
+        import os
+
         self._playwright = await async_playwright().start()
-        self._browser = await self._playwright.chromium.launch(
-            headless=getattr(self._settings, "jobclaw_headless", True),
+
+        profile_dir = os.path.expanduser("~/.jobclaw/browser_profiles/jobsdb")
+        os.makedirs(profile_dir, exist_ok=True)
+
+        viewport_w = random.randint(1280, 1920)
+        viewport_h = random.randint(800, 1080)
+
+        self._context = await self._playwright.chromium.launch_persistent_context(
+            profile_dir,
+            channel="chrome",
+            headless=False,  # system Chrome with login state
             args=[
                 "--disable-blink-features=AutomationControlled",
                 "--disable-dev-shm-usage",
                 "--no-sandbox",
             ],
-        )
-        return self
-
-    async def __aexit__(self, *args: object) -> None:
-        if self._browser:
-            await self._browser.close()
-        if self._playwright:
-            await self._playwright.stop()
-
-    async def _create_stealth_context(self) -> BrowserContext:
-        """Create a browser context with anti-detection measures."""
-        if not self._browser:
-            raise RuntimeError("Browser not initialized.")
-
-        viewport_w = random.randint(1280, 1920)
-        viewport_h = random.randint(800, 1080)
-
-        context = await self._browser.new_context(
             user_agent=random.choice(_USER_AGENTS),
             viewport={"width": viewport_w, "height": viewport_h},
             locale="en-HK",
             timezone_id="Asia/Hong_Kong",
         )
 
-        # Remove webdriver flag
-        await context.add_init_script("""
+        # Anti-detection init script
+        await self._context.add_init_script("""
             Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
-            // Override chrome.runtime to look like a real browser
             window.chrome = { runtime: {} };
-            // Override permissions
             const originalQuery = window.navigator.permissions.query;
             window.navigator.permissions.query = (parameters) =>
                 parameters.name === 'notifications'
@@ -98,7 +89,13 @@ class JobsDBScraper(BaseScraper):
                     : originalQuery(parameters);
         """)
 
-        return context
+        return self
+
+    async def __aexit__(self, *args: object) -> None:
+        if self._context:
+            await self._context.close()
+        if self._playwright:
+            await self._playwright.stop()
 
     async def scrape_jobs(
         self,
@@ -117,19 +114,10 @@ class JobsDBScraper(BaseScraper):
             quick_apply_only: If True, only return jobs with Quick Apply button.
                 Non-Quick-Apply jobs redirect to external sites which we don't support.
         """
-        if not self._browser:
+        if not self._context:
             raise RuntimeError("Scraper not initialized. Use 'async with' context.")
 
-        context = await self._create_stealth_context()
-
-        # Inject cookies if available
-        try:
-            from jobclaw.auth.cookie_manager import inject_cookies
-            await inject_cookies(context, "jobsdb", self._settings)
-        except Exception as e:
-            logger.debug("JobsDB cookie injection skipped: %s", e)
-
-        page = await context.new_page()
+        page = await self._context.new_page()
         jobs: list[Job] = []
 
         try:
@@ -172,7 +160,7 @@ class JobsDBScraper(BaseScraper):
             # Fetch full job descriptions from detail pages
             for i, job in enumerate(jobs):
                 try:
-                    detail = await self._fetch_job_detail(context, str(job.url))
+                    detail = await self._fetch_job_detail(self._context, str(job.url))
                     if detail:
                         job.description = detail
                         logger.info("Fetched detail %d/%d: %s", i + 1, len(jobs), job.title)
@@ -189,7 +177,7 @@ class JobsDBScraper(BaseScraper):
             except Exception as api_err:
                 logger.error("JobsDB API fallback also failed: %s", api_err)
         finally:
-            await context.close()
+            await page.close()
 
         logger.info("JobsDB: scraped %d jobs for query '%s'", len(jobs), query)
         return jobs
