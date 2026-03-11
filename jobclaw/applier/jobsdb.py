@@ -430,14 +430,12 @@ class JobsDBApplier(BaseApplier):
         await self._human_delay(2.0, 3.0)
 
         # Look for a job card with Quick Apply
-        cards = await page.query_selector_all(
-            'article[data-testid="job-card"], [data-automation="jobListing"]'
-        )
+        cards = await page.query_selector_all('[data-testid="job-card"]')
         for card in cards[:10]:
             try:
                 card_text = await card.inner_text()
                 if "quick apply" in card_text.lower() or "快速申請" in card_text:
-                    link = await card.query_selector('a[data-automation="jobTitle"], h3 a')
+                    link = await card.query_selector('[data-automation="jobTitle"]')
                     if link:
                         href = await link.get_attribute("href") or ""
                         if href.startswith("/"):

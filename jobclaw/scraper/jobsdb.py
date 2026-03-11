@@ -131,7 +131,7 @@ class JobsDBScraper(BaseScraper):
 
             # Wait for job cards to appear
             await page.wait_for_selector(
-                'article[data-testid="job-card"], [data-automation="jobListing"]',
+                '[data-testid="job-card"]',
                 timeout=15_000,
             )
 
@@ -139,9 +139,7 @@ class JobsDBScraper(BaseScraper):
             await self._human_scroll(page, scroll_count=min(limit // 10 + 1, 5))
 
             # Parse job cards
-            cards = await page.query_selector_all(
-                'article[data-testid="job-card"], [data-automation="jobListing"]'
-            )
+            cards = await page.query_selector_all('[data-testid="job-card"]')
 
             for card in cards[:limit * 2]:  # fetch extra since some may be filtered
                 try:
@@ -188,7 +186,7 @@ class JobsDBScraper(BaseScraper):
         """Parse a single job card element into a Job object."""
         # Title
         title_el = await card.query_selector(
-            'a[data-automation="jobTitle"], h3 a, [data-testid="job-card-title"] a'
+            '[data-automation="jobTitle"], [data-testid="job-card-title"] a'
         )
         if not title_el:
             return None
@@ -197,37 +195,30 @@ class JobsDBScraper(BaseScraper):
         href = await title_el.get_attribute("href") or ""
 
         # Company
-        company_el = await card.query_selector(
-            'a[data-automation="jobCompany"], [data-testid="company-name"] a, '
-            'span[data-automation="jobCompany"]'
-        )
+        company_el = await card.query_selector('[data-automation="jobCompany"]')
         company = (await company_el.inner_text()).strip() if company_el else "Unknown"
 
         # Location
         loc_el = await card.query_selector(
-            'a[data-automation="jobLocation"], [data-testid="job-card-location"], '
-            'span[data-automation="jobLocation"]'
+            '[data-automation="jobCardLocation"], [data-automation="jobLocation"]'
         )
         job_location = (await loc_el.inner_text()).strip() if loc_el else (location or "Hong Kong")
 
         # Salary
-        salary_el = await card.query_selector(
-            '[data-automation="jobSalary"], [data-testid="job-card-salary"], '
-            'span.salary'
-        )
+        salary_el = await card.query_selector('[data-automation="jobSalary"]')
         salary_text = (await salary_el.inner_text()).strip() if salary_el else ""
         salary = _parse_jobsdb_salary(salary_text) if salary_text else None
 
         # Description / snippet
         desc_el = await card.query_selector(
-            '[data-automation="jobShortDescription"], [data-testid="job-card-description"], '
-            'span.job-description'
+            '[data-automation="jobShortDescription"], [data-testid="job-card-teaser"]'
         )
         description = (await desc_el.inner_text()).strip() if desc_el else ""
 
-        # Tags
+        # Classification tags
         tag_els = await card.query_selector_all(
-            '[data-automation="jobTag"], .badge, .tag'
+            '[data-automation="jobSubClassification"], [data-automation="jobClassification"], '
+            '[data-testid="job-classification"]'
         )
         tags = [await t.inner_text() for t in tag_els]
 
