@@ -218,7 +218,14 @@ async def _call_llm(system: str, user: str) -> str:
         SystemMessage(content=system),
         HumanMessage(content=user),
     ])
-    return response.content
+    content = response.content
+    # Some providers (e.g. Gemini) return a list of content blocks
+    if isinstance(content, list):
+        content = "\n".join(
+            part.get("text", str(part)) if isinstance(part, dict) else str(part)
+            for part in content
+        )
+    return content
 
 
 def _clean_yaml_response(text: str) -> str:

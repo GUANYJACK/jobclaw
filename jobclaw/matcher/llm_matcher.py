@@ -148,6 +148,11 @@ class LLMMatcher:
                     HumanMessage(content=prompt),
                 ])
                 raw = response.content
+                if isinstance(raw, list):
+                    raw = "\n".join(
+                        part.get("text", str(part)) if isinstance(part, dict) else str(part)
+                        for part in raw
+                    )
 
             result = json.loads(raw)
 
