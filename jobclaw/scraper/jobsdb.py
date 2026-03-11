@@ -140,19 +140,26 @@ class JobsDBScraper(BaseScraper):
 
             # Parse job cards
             cards = await page.query_selector_all('[data-testid="job-card"]')
+            logger.info("JobsDB: found %d job cards on page", len(cards))
 
             for card in cards[:limit * 2]:  # fetch extra since some may be filtered
                 try:
                     job = await self._parse_card(card, page, location)
                     if job:
+                        logger.info(
+                            "Parsed: %s (quick_apply=%s)",
+                            job.title, job.metadata.get("quick_apply"),
+                        )
                         if quick_apply_only and not job.metadata.get("quick_apply"):
                             logger.debug("Skipped (no Quick Apply): %s", job.title)
                             continue
                         jobs.append(job)
                         if len(jobs) >= limit:
                             break
+                    else:
+                        logger.debug("Card returned None")
                 except Exception as e:
-                    logger.warning("Failed to parse JobsDB card: %s", e)
+                    logger.warning("Failed to parse JobsDB card: %s", e, exc_info=True)
                     continue
 
             # Fetch full job descriptions from detail pages

@@ -105,6 +105,8 @@ def init_profile_command(output: str) -> None:
 @click.option("--output", "-o", default=None, type=click.Path(), help="Save results to JSON file.")
 def scrape_command(platform: str, query: str, location: str | None, limit: int, output: str | None) -> None:
     """Scrape jobs from selected platforms and print a summary."""
+    import logging
+    logging.basicConfig(level=logging.INFO, format="%(name)s %(levelname)s: %(message)s")
 
     asyncio.run(_scrape(platform=platform, query=query, location=location, limit=limit, output=output))
 
