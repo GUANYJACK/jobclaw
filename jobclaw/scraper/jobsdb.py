@@ -105,6 +105,8 @@ class JobsDBScraper(BaseScraper):
         query: str,
         location: str | None = None,
         limit: int = 20,
+        *,
+        quick_apply_only: bool = True,
     ) -> list[Job]:
         """Scrape JobsDB for jobs matching query.
 
@@ -112,6 +114,8 @@ class JobsDBScraper(BaseScraper):
             query: Search keywords (e.g. "Python Engineer").
             location: Optional location filter (e.g. "Hong Kong").
             limit: Maximum number of jobs to return.
+            quick_apply_only: If True, only return jobs with Quick Apply button.
+                Non-Quick-Apply jobs redirect to external sites which we don't support.
         """
         if not self._browser:
             raise RuntimeError("Scraper not initialized. Use 'async with' context.")
@@ -151,11 +155,16 @@ class JobsDBScraper(BaseScraper):
                 'article[data-testid="job-card"], [data-automation="jobListing"]'
             )
 
-            for card in cards[:limit]:
+            for card in cards[:limit * 2]:  # fetch extra since some may be filtered
                 try:
                     job = await self._parse_card(card, page, location)
                     if job:
+                        if quick_apply_only and not job.metadata.get("quick_apply"):
+                            logger.debug("Skipped (no Quick Apply): %s", job.title)
+                            continue
                         jobs.append(job)
+                        if len(jobs) >= limit:
+                            break
                 except Exception as e:
                     logger.warning("Failed to parse JobsDB card: %s", e)
                     continue
@@ -234,6 +243,33 @@ class JobsDBScraper(BaseScraper):
         )
         tags = [await t.inner_text() for t in tag_els]
 
+        # Detect Quick Apply button on the card
+        quick_apply = False
+        quick_apply_selectors = [
+            'button:has-text("Quick apply")',
+            'button:has-text("快速申請")',
+            'a:has-text("Quick apply")',
+            '[data-automation="quickApply"]',
+            '[data-automation="job-detail-apply"]',
+        ]
+        for qa_sel in quick_apply_selectors:
+            try:
+                qa_el = await card.query_selector(qa_sel)
+                if qa_el:
+                    quick_apply = True
+                    break
+            except Exception:
+                continue
+
+        # Also check the card text for "Quick apply" badge
+        if not quick_apply:
+            try:
+                card_text = await card.inner_text()
+                if "quick apply" in card_text.lower() or "快速申請" in card_text:
+                    quick_apply = True
+            except Exception:
+                pass
+
         # Build URL
         if href.startswith("http"):
             url = href
@@ -251,6 +287,7 @@ class JobsDBScraper(BaseScraper):
             description=description,
             salary=salary,
             tags=tags,
+            metadata={"quick_apply": quick_apply},
         )
 
     async def _scrape_via_api(

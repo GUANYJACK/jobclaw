@@ -47,6 +47,38 @@ def validate_profile_command(profile_path: Path) -> None:
     click.echo(f"Profile OK: {profile.name} ({len(profile.skills)} skills)")
 
 
+@main.command("resumes")
+@click.option(
+    "--platform",
+    type=click.Choice(["jobsdb"]),
+    default="jobsdb",
+    show_default=True,
+    help="Platform to fetch resumes from.",
+)
+def resumes_command(platform: str) -> None:
+    """List resumes saved on your job platform account."""
+    if platform == "jobsdb":
+        asyncio.run(_list_resumes_jobsdb())
+
+
+async def _list_resumes_jobsdb() -> None:
+    """Fetch and display JobsDB resumes."""
+    settings = get_settings()
+    applier = JobsDBApplier(settings)
+    async with applier:
+        resumes = await applier.fetch_resume_list()
+
+    if not resumes:
+        click.echo("❌ No resumes found on your JobsDB account.")
+        click.echo("   Make sure you're logged in: jobclaw login --platform jobsdb")
+        return
+
+    click.echo(f"\n📄 Found {len(resumes)} resume(s) on JobsDB:\n")
+    for r in resumes:
+        click.echo(f"  [{r['index'] + 1}] {r['name']}")
+    click.echo()
+
+
 @main.command("init-profile")
 @click.option(
     "--output", "-o",
@@ -261,6 +293,8 @@ async def _scrape(platform: str, query: str, location: str | None, limit: int, o
                 f"    🏢 {job.company} | 📍 {job.location}{salary_str}\n"
                 f"    🔗 {job.url}"
             )
+            if job.metadata.get("quick_apply"):
+                click.echo("    ⚡ Quick Apply")
             if job.tags:
                 click.echo(f"    🏷️  {', '.join(job.tags)}")
             if job.description:
@@ -316,6 +350,16 @@ async def _run_pipeline(
     boss_applier = BossApplier(settings)
     linkedin_applier = LinkedInApplier(settings)
     jobsdb_applier = JobsDBApplier(settings)
+
+    # If applying to JobsDB jobs, let user choose which resume to use
+    has_jobsdb_jobs = any(
+        job.source == JobSource.JOBSDB
+        and next((m.score for m in top_matches if m.job_id == job.id), 0.0) >= 0.75
+        for job in jobs
+    )
+    if has_jobsdb_jobs:
+        async with jobsdb_applier:
+            await jobsdb_applier.select_resume_interactive()
 
     applications = []
     for job in jobs:
