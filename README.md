@@ -55,15 +55,16 @@
 
 不是简单的关键词匹配，而是用大模型理解你的背景和岗位要求，给出**匹配分数 + 匹配理由**。
 
-**三种 LLM 认证方式（优先级递减）：**
+**四种 LLM 认证方式（优先级递减）：**
 
 | 优先级 | 方式 | 费用 | 说明 |
 |--------|------|------|------|
 | 🥇 | **Claude OAuth** | **免费** | 白嫖 Claude Code 订阅额度，零 API 费用！ |
 | 🥈 | Anthropic API Key | 按量付费 | 直接调用 Claude API |
-| 🥉 | OpenAI API Key | 按量付费 | 调用 GPT 系列模型 |
+| 🥉 | **Google Gemini** | **免费额度** | Gemini 2.0 Flash 有免费调用额度 |
+| 4️⃣ | OpenAI API Key | 按量付费 | 调用 GPT 系列模型 |
 
-> 💡 **省钱秘籍：** 如果你有 Claude Code 订阅（$20/月），JobClaw 可以直接复用你的 OAuth token 调用 LLM，**不额外花一分钱**。Token 过期会自动刷新，完全无感。
+> 💡 **省钱秘籍：** Claude Code 订阅可白嫖 OAuth token；Google Gemini 有免费调用额度（`GOOGLE_API_KEY`），两种都能**零成本**使用 LLM。
 
 ### 📮 Boss直聘自动投递（核心卖点）
 
@@ -298,6 +299,9 @@ jobclaw validate-profile --profile profiles/me.yaml
 | `ANTHROPIC_API_KEY` | 否 | - | Anthropic API Key |
 | `OPENAI_API_KEY` | 否 | - | OpenAI API Key |
 | `JOBCLAW_LLM_MODEL` | 否 | `gpt-4o-mini` | OpenAI 使用的模型 |
+| **Google Gemini** | | | |
+| `GOOGLE_API_KEY` | 否 | — | Google AI API Key ([免费获取](https://aistudio.google.com/apikey)) |
+| `GEMINI_MODEL` | 否 | `gemini-2.0-flash` | Gemini 模型名 |
 | **平台 Cookie** | | | |
 | `BOSS_COOKIE` | 否 | - | Boss直聘 cookie（优先于持久化文件） |
 | `LINKEDIN_COOKIE` | 否 | - | LinkedIn cookie |
@@ -321,7 +325,9 @@ jobclaw validate-profile --profile profiles/me.yaml
 | `HTTP_PROXY` | 否 | - | HTTP 代理 |
 | `HTTPS_PROXY` | 否 | - | HTTPS 代理 |
 
-> 🆓 **零成本 LLM 方案：** 安装 Claude Code CLI（`npm i -g @anthropic-ai/claude-code`）并登录，JobClaw 自动检测 OAuth token，**无需 API Key，零额外费用**。
+> 🆓 **零成本 LLM 方案：**
+> - **Claude OAuth：** 安装 Claude Code CLI 并登录，自动检测 token。
+> - **Google Gemini：** 在 [Google AI Studio](https://aistudio.google.com/apikey) 免费获取 API Key，设置 `GOOGLE_API_KEY`。
 
 ### `profiles/me.yaml` 求职画像
 

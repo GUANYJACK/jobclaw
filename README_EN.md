@@ -54,15 +54,16 @@ Your time is better spent **preparing for interviews and building skills** — n
 
 Not simple keyword matching — JobClaw uses large language models to understand your background and job requirements, producing **match scores with explanations**.
 
-**Three authentication methods (in priority order):**
+**Four authentication methods (in priority order):**
 
 | Priority | Method | Cost | Notes |
 |----------|--------|------|-------|
 | 🥇 | **Claude OAuth** | **Free** | Piggyback on your Claude Code subscription — zero API cost! |
 | 🥈 | Anthropic API Key | Pay-per-use | Direct Claude API calls |
-| 🥉 | OpenAI API Key | Pay-per-use | GPT model family |
+| 🥉 | **Google Gemini** | **Free tier** | Gemini 2.0 Flash has a generous free quota |
+| 4️⃣ | OpenAI API Key | Pay-per-use | GPT model family |
 
-> 💡 **Cost-saving tip:** If you have a Claude Code subscription ($20/month), JobClaw can reuse your OAuth token — **no additional API cost whatsoever**. Tokens auto-refresh before expiry.
+> 💡 **Cost-saving tip:** Claude Code subscription gives free OAuth access; Google Gemini has a free API tier — both let you use LLM at **zero cost**.
 
 ### 📮 Boss直聘 Auto-Apply (China Market)
 
@@ -297,6 +298,9 @@ Catch YAML errors before running the pipeline.
 | `ANTHROPIC_API_KEY` | No | - | Anthropic API key |
 | `OPENAI_API_KEY` | No | - | OpenAI API key |
 | `JOBCLAW_LLM_MODEL` | No | `gpt-4o-mini` | Model for OpenAI |
+| **Google Gemini** | | | |
+| `GOOGLE_API_KEY` | No | — | Google AI API Key ([free](https://aistudio.google.com/apikey)) |
+| `GEMINI_MODEL` | No | `gemini-2.0-flash` | Gemini model name |
 | **Platform Cookies** | | | |
 | `BOSS_COOKIE` | No | - | Boss直聘 cookie (overrides saved file) |
 | `LINKEDIN_COOKIE` | No | - | LinkedIn cookie |
@@ -320,7 +324,9 @@ Catch YAML errors before running the pipeline.
 | `HTTP_PROXY` | No | - | HTTP proxy |
 | `HTTPS_PROXY` | No | - | HTTPS proxy |
 
-> 🆓 **Zero-Cost LLM:** Install Claude Code CLI (`npm i -g @anthropic-ai/claude-code`), log in, and JobClaw auto-detects your OAuth token. **No API key needed, zero extra cost.**
+> 🆓 **Zero-Cost LLM Options:**
+> - **Claude OAuth:** Install Claude Code CLI and log in — token auto-detected.
+> - **Google Gemini:** Get a free API key from [Google AI Studio](https://aistudio.google.com/apikey), set `GOOGLE_API_KEY`.
 
 ### `profiles/me.yaml` — Job Seeker Profile
 

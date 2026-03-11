@@ -159,7 +159,15 @@ async def _check_llm_status() -> None:
     else:
         click.echo("  Anthropic API Key: ❌ Not set")
 
-    # 3. OpenAI API Key
+    # 3. Google Gemini API Key
+    if settings.google_api_key:
+        masked = settings.google_api_key[:8] + "..." + settings.google_api_key[-4:]
+        click.echo(f"  Google Gemini: ✅ Set ({masked})")
+        click.echo(f"    Model: {settings.gemini_model}")
+    else:
+        click.echo("  Google Gemini: ❌ Not set (GOOGLE_API_KEY)")
+
+    # 4. OpenAI API Key
     import os
     openai_key = os.getenv("OPENAI_API_KEY")
     if openai_key:

@@ -34,6 +34,10 @@ class Settings(BaseSettings):
         default="claude-sonnet-4-6", alias="CLAUDE_MODEL",
     )
 
+    # Google Gemini
+    google_api_key: str | None = Field(default=None, alias="GOOGLE_API_KEY")
+    gemini_model: str = Field(default="gemini-2.0-flash", alias="GEMINI_MODEL")
+
     boss_cookie: str | None = None
     boss_greeting: str | None = Field(
         default=None,

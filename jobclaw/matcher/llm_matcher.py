@@ -38,12 +38,12 @@ Return ONLY valid JSON, no markdown."""
 def _resolve_llm_backend() -> tuple[str, str | None]:
     """Determine which LLM backend to use.
 
-    Priority: Claude OAuth > GitHub Copilot > ANTHROPIC_API_KEY > OPENAI_API_KEY
+    Priority: Claude OAuth > ANTHROPIC_API_KEY > GOOGLE_API_KEY > OPENAI_API_KEY
 
     Returns
     -------
     (backend, model_name) where backend is one of
-    ``"claude-oauth"``, ``"anthropic"``, ``"openai"``.
+    ``"claude-oauth"``, ``"anthropic"``, ``"google"``, ``"openai"``.
     """
     settings = get_settings()
 
@@ -59,7 +59,11 @@ def _resolve_llm_backend() -> tuple[str, str | None]:
     if settings.anthropic_api_key:
         return "anthropic", settings.claude_model
 
-    # 3. OpenAI API key (default fallback)
+    # 3. Google Gemini API key
+    if settings.google_api_key:
+        return "google", settings.gemini_model
+
+    # 4. OpenAI API key (default fallback)
     return "openai", settings.jobclaw_llm_model
 
 
@@ -69,7 +73,8 @@ class LLMMatcher:
     Authentication priority:
       1. Claude OAuth (``~/.claude/.credentials.json`` from Claude Code CLI)
       2. ``ANTHROPIC_API_KEY`` (regular Anthropic API key)
-      3. ``OPENAI_API_KEY`` (OpenAI, default fallback)
+      3. ``GOOGLE_API_KEY`` (Google Gemini)
+      4. ``OPENAI_API_KEY`` (OpenAI, default fallback)
     """
 
     def __init__(self, model_name: str | None = None) -> None:
@@ -110,6 +115,11 @@ class LLMMatcher:
                 self._model_name, model_provider="anthropic",
             )
             logger.info("Using Anthropic API key (%s)", self._model_name)
+        elif self._backend == "google":
+            self._llm = init_chat_model(
+                self._model_name, model_provider="google_genai",
+            )
+            logger.info("Using Google Gemini (%s)", self._model_name)
         else:
             self._llm = init_chat_model(self._model_name)
             logger.info("Using OpenAI (%s)", self._model_name)

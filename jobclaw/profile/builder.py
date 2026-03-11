@@ -205,6 +205,8 @@ async def _call_llm(system: str, user: str) -> str:
 
     if backend == "anthropic":
         llm = init_chat_model(model_name, model_provider="anthropic")
+    elif backend == "google":
+        llm = init_chat_model(model_name or settings.gemini_model, model_provider="google_genai")
     else:
         llm = init_chat_model(model_name or "gpt-4o-mini")
 
