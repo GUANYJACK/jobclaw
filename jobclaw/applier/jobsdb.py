@@ -32,10 +32,12 @@ _BTN_QUICK_APPLY = [
 ]
 
 _RESUME_SELECT = [
-    'input[type="radio"]',  # resume radio buttons
-    '[data-automation="resume-select"]',
-    '[data-testid="resume-option"]',
+    '[data-testid="resume-method-change"]',   # radio: use existing resume
+    '[data-testid="resume-method-upload"]',    # radio: upload new file
+    '[data-testid="resume-method-none"]',      # radio: no resume
 ]
+
+_RESUME_DROPDOWN = '[data-testid="resumeSelectInput"] select[data-testid="select-input"]'
 
 _RESUME_UPLOAD = [
     'input[type="file"]',
@@ -104,6 +106,7 @@ class JobsDBApplier(BaseApplier):
         self._history = history or ApplyHistory()
         self._resume_path = resume_path or getattr(settings, "jobsdb_resume_path", None)
         self._resume_index = resume_index  # 0-based index of selected resume
+        self._resume_value: str | None = None  # UUID of selected resume
         self._playwright: Playwright | None = None
         self._browser: Browser | None = None
 
@@ -288,39 +291,54 @@ class JobsDBApplier(BaseApplier):
     async def _select_resume(self, page: Page) -> bool:
         """Select a resume in the apply form.
 
-        If resume_index is set, selects that specific resume.
-        Otherwise selects the first available one.
+        Clicks 'resume-method-change' radio, then picks a resume from the
+        <select> dropdown by stored resume_index or value.
         """
-        for sel in _RESUME_SELECT:
-            try:
-                radios = await page.query_selector_all(sel)
-                visible_radios = [r for r in radios if await r.is_visible()]
-                if not visible_radios:
-                    continue
+        # 1. Click the "use existing resume" radio
+        change_radio = await page.query_selector('[data-testid="resume-method-change"]')
+        if not change_radio:
+            logger.warning("resume-method-change radio not found")
+            return False
+        await change_radio.click()
+        await self._human_delay(0.5, 1.0)
 
-                # Use specified index, or default to first
-                idx = self._resume_index if self._resume_index is not None else 0
-                if idx >= len(visible_radios):
-                    idx = 0
+        # 2. Pick from dropdown
+        select_el = await page.query_selector(_RESUME_DROPDOWN)
+        if not select_el:
+            logger.warning("Resume select dropdown not found")
+            return False
 
-                await visible_radios[idx].click()
-                logger.info("Selected resume #%d via %s", idx + 1, sel)
-                return True
-            except Exception:
-                continue
-        return False
+        # Get available options (skip the disabled placeholder)
+        options = await select_el.query_selector_all('option:not([disabled])')
+        if not options:
+            logger.warning("No resume options in dropdown")
+            return False
 
-    async def fetch_resume_list(self, sample_job_url: str | None = None) -> list[dict]:
-        """Fetch the list of resumes available on the user's JobsDB account.
+        # Use stored value or index
+        if self._resume_value:
+            await select_el.select_option(value=self._resume_value)
+            logger.info("Selected resume by value: %s", self._resume_value)
+        else:
+            idx = self._resume_index if self._resume_index is not None else 0
+            idx = min(idx, len(options) - 1)
+            value = await options[idx].get_attribute("value")
+            await select_el.select_option(value=value)
+            logger.info("Selected resume #%d", idx + 1)
 
-        Opens a Quick Apply page to extract the resume options.
+        return True
+
+    async def fetch_resume_list(self, apply_page_url: str | None = None) -> list[dict]:
+        """Fetch the list of resumes from the user's JobsDB account.
+
+        Opens an apply page (needs login cookies) to read the resume
+        <select> dropdown options.
 
         Args:
-            sample_job_url: A Quick Apply job URL to open. If None, uses a
-                default search to find one.
+            apply_page_url: A specific /apply URL. If None, searches for
+                a Quick Apply job to open.
 
         Returns:
-            List of dicts with keys: index, name, detail (e.g. file name, date).
+            List of dicts: {index, name, value}.
         """
         if not self._browser:
             raise RuntimeError("JobsDBApplier not initialised — use 'async with'.")
@@ -346,77 +364,37 @@ class JobsDBApplier(BaseApplier):
         resumes: list[dict] = []
 
         try:
-            # Navigate to apply page
-            url = sample_job_url or "https://hk.jobsdb.com/jobs?keywords=data"
-            if "/apply" not in url:
-                # We need a job apply page — navigate to job list and find one
-                await page.goto(url, wait_until="domcontentloaded", timeout=45_000)
-                await self._human_delay(2.0, 3.0)
-
-                # Click on first Quick Apply job
-                qa_btn = await self._find_element(page, [
-                    'button:has-text("Quick apply")',
-                    'button:has-text("快速申請")',
-                    'a:has-text("Quick apply")',
-                ])
-                if qa_btn:
-                    await qa_btn.click()
-                    await self._human_delay(2.0, 4.0)
+            if apply_page_url and "/apply" in apply_page_url:
+                url = apply_page_url
             else:
-                await page.goto(url, wait_until="domcontentloaded", timeout=45_000)
-                await self._human_delay(2.0, 3.0)
+                # Find a Quick Apply job to open its apply page
+                url = await self._find_quick_apply_url(page)
+                if not url:
+                    logger.error("Could not find a Quick Apply job to fetch resumes")
+                    return []
 
-            # Extract resume options
-            # JobsDB shows resumes as radio buttons or cards in the apply form
-            resume_selectors = [
-                # Radio button labels
-                'label:has(input[type="radio"])',
-                '[data-automation="resume-select"] label',
-                '[data-testid="resume-option"]',
-                # Resume cards
-                '.resume-card',
-                '[class*="resume"] label',
-                '[class*="Resume"] label',
-            ]
+            logger.info("Opening apply page: %s", url)
+            await page.goto(url, wait_until="domcontentloaded", timeout=45_000)
+            await self._human_delay(2.0, 4.0)
 
-            for sel in resume_selectors:
-                try:
-                    elements = await page.query_selector_all(sel)
-                    for i, el in enumerate(elements):
-                        if await el.is_visible():
-                            text = (await el.inner_text()).strip()
-                            if text:
-                                resumes.append({
-                                    "index": i,
-                                    "name": text.split("\n")[0].strip(),
-                                    "detail": text,
-                                })
-                except Exception:
-                    continue
+            # Click "use existing resume" radio to reveal dropdown
+            change_radio = await page.query_selector('[data-testid="resume-method-change"]')
+            if change_radio:
+                await change_radio.click()
+                await self._human_delay(0.5, 1.0)
 
-                if resumes:
-                    break
+            # Read dropdown options
+            select_el = await page.query_selector(_RESUME_DROPDOWN)
+            if not select_el:
+                logger.warning("Resume dropdown not found on apply page")
+                return []
 
-            # Fallback: check for any radio buttons in the form
-            if not resumes:
-                try:
-                    radios = await page.query_selector_all('input[type="radio"]')
-                    for i, radio in enumerate(radios):
-                        if await radio.is_visible():
-                            # Try to get the associated label
-                            radio_id = await radio.get_attribute("id")
-                            label_text = f"Resume #{i + 1}"
-                            if radio_id:
-                                label_el = await page.query_selector(f'label[for="{radio_id}"]')
-                                if label_el:
-                                    label_text = (await label_el.inner_text()).strip()
-                            resumes.append({
-                                "index": i,
-                                "name": label_text,
-                                "detail": label_text,
-                            })
-                except Exception:
-                    pass
+            options = await select_el.query_selector_all('option:not([disabled])')
+            for i, opt in enumerate(options):
+                name = (await opt.inner_text()).strip()
+                value = await opt.get_attribute("value") or ""
+                if name and value:
+                    resumes.append({"index": i, "name": name, "value": value})
 
         except Exception as e:
             logger.error("Failed to fetch resume list: %s", e)
@@ -425,7 +403,38 @@ class JobsDBApplier(BaseApplier):
 
         return resumes
 
-    async def select_resume_interactive(self, sample_job_url: str | None = None) -> bool:
+    async def _find_quick_apply_url(self, page: Page) -> str | None:
+        """Search JobsDB and find the apply URL of the first Quick Apply job."""
+        await page.goto(
+            "https://hk.jobsdb.com/jobs?keywords=data",
+            wait_until="domcontentloaded",
+            timeout=45_000,
+        )
+        await self._human_delay(2.0, 3.0)
+
+        # Look for a job card with Quick Apply
+        cards = await page.query_selector_all(
+            'article[data-testid="job-card"], [data-automation="jobListing"]'
+        )
+        for card in cards[:10]:
+            try:
+                card_text = await card.inner_text()
+                if "quick apply" in card_text.lower() or "快速申請" in card_text:
+                    link = await card.query_selector('a[data-automation="jobTitle"], h3 a')
+                    if link:
+                        href = await link.get_attribute("href") or ""
+                        if href.startswith("/"):
+                            href = f"https://hk.jobsdb.com{href}"
+                        # Extract job ID and build apply URL
+                        import re
+                        m = re.search(r"/job/(\d+)", href)
+                        if m:
+                            return f"https://hk.jobsdb.com/job/{m.group(1)}/apply"
+            except Exception:
+                continue
+        return None
+
+    async def select_resume_interactive(self, apply_page_url: str | None = None) -> bool:
         """Interactive CLI flow: fetch resumes and let user pick one.
 
         Returns:
@@ -434,7 +443,7 @@ class JobsDBApplier(BaseApplier):
         import click
 
         click.echo("\n📄 Fetching your JobsDB resume list...")
-        resumes = await self.fetch_resume_list(sample_job_url)
+        resumes = await self.fetch_resume_list(apply_page_url)
 
         if not resumes:
             click.echo("  ⚠️ No resumes found on your account.")
@@ -455,11 +464,13 @@ class JobsDBApplier(BaseApplier):
         idx = choice - 1
         if 0 <= idx < len(resumes):
             self._resume_index = idx
+            self._resume_value = resumes[idx]["value"]
             click.echo(click.style(f"  ✅ Selected: {resumes[idx]['name']}", fg="green"))
             return True
         else:
             click.echo("  Invalid choice, using first resume.")
             self._resume_index = 0
+            self._resume_value = resumes[0]["value"]
             return True
 
     async def _upload_resume(self, page: Page) -> bool:
